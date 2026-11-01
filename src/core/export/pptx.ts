@@ -267,7 +267,7 @@ function addChart(pptx: PptxGenJS, slide: PptxGenJS.Slide, el: ChartEl, objectNa
     w: el.w,
     h: el.h,
     objectName,
-    chartColors: el.colors,
+    chartColors: multi || isPie ? el.colors : [el.colors[0]],
     showLegend: multi || isPie,
     legendPos: 'b',
     legendColor: el.textColor,

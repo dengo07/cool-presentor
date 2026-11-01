@@ -274,19 +274,8 @@ export function renderComparison(ctx: Ctx, b: BlockOf<'comparison'>, box: Box): 
     card(ctx, `${b.id}-card${i}`, { x, y: box.y, w: cw, h: box.h }, { accent })
     const pad = 0.45
     const fg = accent ? t.onAccent : t.text
-    text(ctx, {
-      id: `${b.id}-label${i}`,
-      role: 'label',
-      text: i === 0 ? 'Option A' : 'Option B',
-      x: x + pad,
-      y: box.y + pad,
-      w: cw - pad * 2,
-      h: 0.32,
-      color: accent ? t.onAccent : t.muted,
-      maxLines: 1
-    })
-    const tt = text(ctx, { id: `${b.id}-title${i}`, role: 'title', text: side.title, x: x + pad, y: box.y + pad + 0.42, w: cw - pad * 2, h: 0.9, max: 32, color: fg, fit: 'content' })
-    const ly = box.y + pad + 0.42 + tt.height + 0.3
+    const tt = text(ctx, { id: `${b.id}-title${i}`, role: 'title', text: side.title, x: x + pad, y: box.y + pad, w: cw - pad * 2, h: 0.9, max: 32, color: fg, fit: 'content' })
+    const ly = box.y + pad + tt.height + 0.3
     hline(ctx, `${b.id}-rule${i}`, x + pad, ly - 0.12, cw - pad * 2, fg, 0.75, 0.25)
     text(ctx, {
       id: `${b.id}-items${i}`,

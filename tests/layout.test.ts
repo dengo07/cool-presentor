@@ -51,7 +51,7 @@ describe('scenes', () => {
           expect(m.height, `${scene.layoutId}/${el.id} overflows`).toBeLessThanOrEqual(el.h + 0.15)
         }
         // morph anchors present on every slide
-        for (const d of ['bg', 'deco-0', 'deco-1', 'deco-2']) expect(ids.has(d)).toBe(true)
+        for (const d of theme.deco === 'none' ? ['bg'] : ['bg', 'deco-0', 'deco-1', 'deco-2']) expect(ids.has(d)).toBe(true)
       }
     })
   }
@@ -98,5 +98,17 @@ describe('xml post-processing', () => {
     expect(mergeBoldFonts(pres)).toBe(
       '<p:embeddedFontLst><p:embeddedFont><p:font typeface="Inter"/><p:regular r:id="rId1"/><p:bold r:id="rId2"/></p:embeddedFont></p:embeddedFontLst>'
     )
+  })
+})
+
+describe('text fitting', () => {
+  it('shrinks text instead of letting a long word break mid-word', async () => {
+    const { fitSize } = await import('../src/core/measure')
+    const style = { font: 'Inter', bold: false, lineHeight: 1.1 }
+    const paras = [{ runs: [{ text: 'Portuguese arrive' }] }]
+    const wordW = heuristicMeasurer.width('Portuguese', 'Inter', 22, false) * 1.05
+    const r = fitSize(heuristicMeasurer, paras, style, 22, 10, wordW * 0.9, 2)
+    expect(r.size).toBeLessThan(22)
+    expect(r.overflow).toBe(false)
   })
 })

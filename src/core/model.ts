@@ -80,10 +80,26 @@ export const Slide = z.object({
   transition: Transition.default('morph')
 })
 
+const hex = z.string().regex(/^[0-9A-Fa-f]{6}$/)
+
+/** Per-deck tweaks on top of the chosen theme. Everything optional. */
+export const ThemeCustom = z.object({
+  bg: hex.optional(),
+  bgGradient: z.boolean().optional(),
+  text: hex.optional(),
+  accents: z.tuple([hex, hex, hex]).optional(),
+  headingFont: z.string().optional(),
+  headingBold: z.boolean().optional(),
+  bodyFont: z.string().optional(),
+  radius: z.number().min(0).max(0.6).optional(),
+  deco: z.enum(['aurora', 'orbs', 'grid', 'lines', 'blocks', 'none']).optional()
+})
+
 export const Deck = z.object({
   version: z.literal(1),
   title: z.string(),
   themeId: z.string(),
+  custom: ThemeCustom.optional(),
   slides: z.array(Slide)
 })
 
@@ -93,6 +109,7 @@ export type Slide = z.infer<typeof Slide>
 export type Deck = z.infer<typeof Deck>
 export type ChartKind = z.infer<typeof ChartKind>
 export type Transition = z.infer<typeof Transition>
+export type ThemeCustom = z.infer<typeof ThemeCustom>
 export type BlockOf<T extends BlockType> = Extract<Block, { type: T }>
 
 // ---------------------------------------------------------------------------

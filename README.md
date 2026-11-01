@@ -18,7 +18,14 @@ Cool Presentor is a desktop app where you never push boxes around. You type what
    ```
    Wrap a word in `*asterisks*` to highlight it in the theme's accent colour (gradient text on some themes); `**double**` makes it bold.
 2. **Design happens automatically.** Each slide gets the best of about 22 layouts for its content. Neighbouring slides are varied. Click a layout chip or press **Shuffle** (`Ctrl+L`) to try others.
-3. **Theme** (`Ctrl+T`). Nine curated themes, each previewed on *your* slides.
+3. **Theme** (`Ctrl+T`). Ten curated themes, each previewed on *your* slides. The **Customize** tab adjusts each deck separately:
+   - background colour, with an optional soft gradient
+   - text colour
+   - three accent colours, from ready-made palettes or **from your photos**
+   - heading and body fonts, plus heading weight
+   - corner radius and decoration style
+
+   Derived colours (highlights, chart colours, card lines, muted text) follow automatically. Contrast warnings flag hard-to-read combinations.
 4. **Duplicate & morph** (`Ctrl+D`). This duplicates a slide into a new layout. Because the elements keep their identity, PowerPoint's Morph animates between the two.
 5. **Present** (`F5`) right in the app, with the same morph-style animation, or **Export .pptx** (`Ctrl+E`).
 6. **AI (optional).**

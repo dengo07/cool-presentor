@@ -15,6 +15,8 @@ export interface Ctx {
   theme: Theme
   slide: Slide
   index: number
+  /** 1-based number of this slide among section-divider slides */
+  section?: number
   total: number
   m: Measurer
   els: El[]
@@ -172,6 +174,7 @@ export function card(ctx: Ctx, id: string, b: Box, opts: { accent?: boolean; rad
     shadow: t.card.shadow ? { color: '1E1B4B', alpha: 0.12, blur: 24, offset: 6, angle: 90 } : undefined
   }
   add(ctx, el)
+  if (t.card.rule && !opts.accent) hline(ctx, `${id}-rule`, b.x, b.y, b.w, t.text, 1.25)
   return el
 }
 
@@ -204,6 +207,7 @@ export interface HeaderOpts extends Box {
   anchor?: 'top' | 'middle' | 'bottom'
   titleColor?: Color
   subColor?: Color
+  eyebrowColor?: Color
 }
 
 /** Places eyebrow/title/subtitle stacked; returns bottom y of the group. */
@@ -222,7 +226,7 @@ export function header(ctx: Ctx, o: HeaderOpts): number {
       kind: 'eyebrow',
       h,
       run: (y) => {
-        text(ctx, { id: 'eyebrow', role: 'label', text: eyebrow.text, x: o.x, y, w: o.w, h, align: o.align, maxLines: 1 })
+        text(ctx, { id: 'eyebrow', role: 'label', text: eyebrow.text, x: o.x, y, w: o.w, h, align: o.align, maxLines: 1, color: o.eyebrowColor })
         return h
       }
     })

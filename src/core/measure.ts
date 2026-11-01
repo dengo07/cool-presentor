@@ -41,8 +41,9 @@ export function measureParas(
   style: TextStyle,
   size: number,
   boxW: number
-): { height: number; lines: number; widest: number } {
+): { height: number; lines: number; widest: number; overflow: boolean } {
   let lines = 0
+  let overflow = false
   let height = 0
   let widest = 0
   const lineH = (size * style.lineHeight * LINE_BOX) / 72
@@ -66,12 +67,20 @@ export function measureParas(
       } else if (!(isSpace && lineW === 0)) {
         lineW += ww
       }
+      // A single word wider than the box would be broken mid-word by the
+      // renderer – count the extra lines so fitting shrinks the text instead.
+      if (!isSpace && ww > avail) {
+        overflow = true
+        const extra = Math.ceil(ww / avail) - 1
+        pl += extra
+        lineW = ww - extra * avail
+      }
     }
     widest = Math.max(widest, lineW + (p.bullet ? p.bullet.indent : 0))
     lines += pl
     height += pl * lineH + ((p.spaceBefore ?? 0) / 72)
   }
-  return { height, lines, widest }
+  return { height, lines, widest, overflow }
 }
 
 /** Largest font size (stepping down) at which paras fit inside w×h. */
@@ -84,11 +93,12 @@ export function fitSize(
   w: number,
   h: number,
   maxLines = Infinity
-): { size: number; height: number; lines: number; widest: number } {
+): { size: number; height: number; lines: number; widest: number; overflow: boolean } {
   let size = maxSize
   for (;;) {
     const r = measureParas(m, scaleParas(paras, size / maxSize), style, size, w)
-    if ((r.height <= h && r.lines <= maxLines) || size <= minSize) return { size, ...r }
+    // a word wider than the box would be split mid-word, so that never counts as fitting
+    if ((r.height <= h && r.lines <= maxLines && !r.overflow) || size <= minSize) return { size, ...r }
     size = Math.max(minSize, Math.round((size - Math.max(1, size * 0.06)) * 2) / 2)
   }
 }

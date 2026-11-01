@@ -110,7 +110,7 @@ export function ChartView({ el }: { el: ChartEl }): React.JSX.Element {
       const start = i * band + (band - groupW) / 2
       el.series.forEach((s, k) => {
         const v = Math.max(0, s.values[i] ?? 0)
-        const color = '#' + el.colors[(multi ? k : i) % el.colors.length]
+        const color = '#' + el.colors[k % el.colors.length]
         if (horizontal) {
           const y = padT + start + k * bw
           const w = (v / max) * pw

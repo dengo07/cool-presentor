@@ -1,7 +1,7 @@
 import type { Deck, Slide } from '../model'
 import type { Measurer } from '../measure'
 import { SLIDE_H, SLIDE_W, type Scene } from '../scene'
-import { getTheme, type Theme } from '../themes'
+import { deckTheme, type Theme } from '../themes'
 import type { Ctx } from './ctx'
 import { decorate } from './deco'
 import { getLayout, LAYOUTS, signature } from './layouts'
@@ -50,9 +50,9 @@ export function resolveLayouts(deck: Deck): string[] {
   return out
 }
 
-export function buildScene(slide: Slide, index: number, total: number, layoutId: string, theme: Theme, m: Measurer): Scene {
+export function buildScene(slide: Slide, index: number, total: number, layoutId: string, theme: Theme, m: Measurer, section?: number): Scene {
   const layout = getLayout(layoutId) ?? getLayout('generic')!
-  const ctx: Ctx = { theme, slide, index, total, m, els: [] }
+  const ctx: Ctx = { theme, slide, index, total, m, els: [], section }
   // background (as a shape so gradients work and Morph can blend it)
   ctx.els.push({ kind: 'shape', id: 'bg', shape: 'rect', x: 0, y: 0, w: SLIDE_W, h: SLIDE_H, fill: theme.bg })
   ctx.els.push(...decorate(ctx, layout.zone))
@@ -61,7 +61,11 @@ export function buildScene(slide: Slide, index: number, total: number, layoutId:
 }
 
 export function buildDeck(deck: Deck, m: Measurer): Scene[] {
-  const theme = getTheme(deck.themeId)
+  const theme = deckTheme(deck)
   const layouts = resolveLayouts(deck)
-  return deck.slides.map((s, i) => buildScene(s, i, deck.slides.length, layouts[i], theme, m))
+  let sections = 0
+  return deck.slides.map((s, i) => {
+    if (layouts[i] === 'section') sections++
+    return buildScene(s, i, deck.slides.length, layouts[i], theme, m, sections)
+  })
 }

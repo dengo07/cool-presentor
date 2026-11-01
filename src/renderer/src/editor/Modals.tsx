@@ -1,13 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Check, KeyRound, Sparkles, X } from 'lucide-react'
-import { THEMES } from '@core/themes'
-import { buildScene, resolveLayouts } from '@core/layout/engine'
-import { SceneView } from '../preview/SceneView'
-import { canvasMeasurer } from '../lib/fonts'
+import { useEffect, useState } from 'react'
+import { KeyRound, Sparkles, X } from 'lucide-react'
 import { useStore } from '../store'
 import { useUi } from '../ui'
+import { ThemeStudio } from './ThemeStudio'
 
-function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }): React.JSX.Element {
+export function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }): React.JSX.Element {
   useEffect(() => {
     const k = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onClose()
@@ -33,46 +30,10 @@ function Modal({ title, onClose, children, wide }: { title: string; onClose: () 
 export function Modals(): React.JSX.Element | null {
   const modal = useUi((s) => s.modal)
   const close = (): void => useUi.getState().open(null)
-  if (modal === 'themes') return <ThemeGallery onClose={close} />
+  if (modal === 'themes') return <ThemeStudio onClose={close} />
   if (modal === 'ai') return <AiDialog onClose={close} />
   if (modal === 'settings') return <SettingsDialog onClose={close} />
   return null
-}
-
-function ThemeGallery({ onClose }: { onClose: () => void }): React.JSX.Element {
-  const deck = useStore((s) => s.deck)
-  const setTheme = useStore((s) => s.setTheme)
-  const current = useStore((s) => s.current)
-  // Preview each theme on the user's own content: the title slide + current slide.
-  const previews = useMemo(() => {
-    const layouts = resolveLayouts(deck)
-    const idx = [...new Set([0, current])]
-    return THEMES.map((t) => ({
-      theme: t,
-      scenes: idx.map((i) => buildScene(deck.slides[i], i, deck.slides.length, layouts[i], t, canvasMeasurer))
-    }))
-  }, [deck, current])
-
-  return (
-    <Modal title="Choose a theme" onClose={onClose} wide>
-      <div className="theme-grid">
-        {previews.map(({ theme, scenes }) => (
-          <button key={theme.id} className={'theme-card' + (deck.themeId === theme.id ? ' on' : '')} onClick={() => setTheme(theme.id)}>
-            <div className="theme-previews">
-              {scenes.map((sc, i) => (
-                <SceneView key={i} scene={sc} width={i === 0 ? 256 : 112} />
-              ))}
-            </div>
-            <div className="theme-meta">
-              <strong>{theme.name}</strong>
-              <span>{theme.tagline}</span>
-              {deck.themeId === theme.id && <Check size={16} className="theme-check" />}
-            </div>
-          </button>
-        ))}
-      </div>
-    </Modal>
-  )
 }
 
 const IDEAS = [

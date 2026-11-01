@@ -12,7 +12,7 @@ import {
   renderText,
   renderTimeline
 } from './blocks'
-import { all, type Box, contentBlocks, type Ctx, header, hline, MX, MY, one, pad2, rect, text, vline } from './ctx'
+import { all, type Box, card, contentBlocks, type Ctx, hasHeader, header, hline, MX, MY, one, pad2, rect, text, vline } from './ctx'
 import type { Zone } from './deco'
 
 // ---------------------------------------------------------------------------
@@ -171,7 +171,8 @@ export const LAYOUTS: Layout[] = [
     render(ctx) {
       const t = ctx.theme
       const hl = t.highlight
-      const run = hl.kind === 'solid' ? { text: pad2(ctx.index + 1), color: hl.color } : { text: pad2(ctx.index + 1), fill: hl, color: hl.stops[0].color }
+      const num = pad2(ctx.section ?? ctx.index + 1)
+      const run = hl.kind === 'solid' ? { text: num, color: hl.color } : { text: num, fill: hl, color: hl.stops[0].color }
       text(ctx, { id: 'section-num', role: 'hero', paras: [{ runs: [run] }], x: MX, y: 1.2, w: 4.4, h: 5, max: 200, valign: 'middle', maxLines: 1 })
       vline(ctx, 'rule', 5.6, 2.3, 2.9, t.accents[0], 2.5)
       header(ctx, { x: 6.2, y: MY, w: W - 6.2 - MX, h: H - MY * 2, role: 'hero', anchor: 'middle', max: 64 })
@@ -191,7 +192,7 @@ export const LAYOUTS: Layout[] = [
   {
     id: 'split',
     name: 'Split columns',
-    zone: 'left',
+    zone: 'corner',
     score: (s) => (s.n.title && (s.n.text || s.n.bullets) && only(s, 'text', 'bullets') ? (s.textLen < 520 ? 7.5 : 5) : 0),
     render(ctx) {
       header(ctx, { x: MX, y: MY, w: 4.9, h: H - MY * 2, anchor: 'middle', max: 46 })
@@ -214,7 +215,7 @@ export const LAYOUTS: Layout[] = [
   {
     id: 'image-left',
     name: 'Image left, full bleed',
-    zone: 'right',
+    zone: 'corner',
     score: (s) => (s.n.image === 1 && only(s, 'image', 'text', 'bullets') ? 9 : 0),
     render(ctx) {
       renderImage(ctx, one(ctx, 'image')!, { x: 0, y: 0, w: W * 0.47, h: H })
@@ -224,7 +225,7 @@ export const LAYOUTS: Layout[] = [
   {
     id: 'image-right',
     name: 'Image right, rounded',
-    zone: 'left',
+    zone: 'corner',
     score: (s) => (s.n.image === 1 && only(s, 'image', 'text', 'bullets') ? 8.5 : 0),
     render(ctx) {
       const r = Math.max(0.15, ctx.theme.radius * 1.5)
@@ -244,17 +245,17 @@ export const LAYOUTS: Layout[] = [
         angle: 90,
         stops: [
           { pos: 0, color: '000000', alpha: 0 },
-          { pos: 40, color: '000000', alpha: 0.05 },
-          { pos: 100, color: '000000', alpha: 0.78 }
+          { pos: 35, color: '000000', alpha: 0.08 },
+          { pos: 100, color: '000000', alpha: 0.85 }
         ]
       })
-      header(ctx, { x: MX, y: H * 0.35, w: 9.5, h: H * 0.65 - MY, anchor: 'bottom', role: 'hero', max: 64, titleColor: 'FFFFFF', subColor: 'E6E6E6' })
+      header(ctx, { x: MX, y: H * 0.35, w: 9.5, h: H * 0.65 - MY, anchor: 'bottom', role: 'hero', max: 64, titleColor: 'FFFFFF', subColor: 'E6E6E6', eyebrowColor: 'FFFFFF' })
     }
   },
   {
     id: 'image-framed',
     name: 'Framed image',
-    zone: 'left',
+    zone: 'corner',
     score: (s) => (s.n.image === 1 && s.n.title && only(s, 'image', 'text', 'bullets') ? 7 : 0),
     render(ctx) {
       const b = { x: W - MX - 5.6, y: 1.05, w: 5.6, h: 5.4 }
@@ -271,6 +272,26 @@ export const LAYOUTS: Layout[] = [
       renderImage(ctx, one(ctx, 'image')!, { x: b.x + pad, y: b.y + pad, w: b.w - pad * 2, h: b.h - pad * 2 })
       ctx.els[ctx.els.length - 1].rotate = -2.5
       headerAndBody(ctx, { x: MX, y: MY, w: W - MX * 2 - 5.6 - 0.8, h: H - MY * 2 })
+    }
+  },
+  {
+    id: 'image-pair',
+    name: 'Two photos',
+    zone: 'corner',
+    score: (s) => (s.n.image === 2 && only(s, 'image') ? 11 : 0),
+    render(ctx) {
+      const imgs = all(ctx, 'image')
+      const bottom = hasHeader(ctx) ? header(ctx, { x: MX, y: MY, w: W - MX * 2 - 1, h: 1.8 }) : MY - 0.35
+      const top = bottom + 0.4
+      const capH = imgs.some((i) => i.alt) ? 0.6 : 0
+      const gap = 0.25
+      const w = (W - MX * 2 - gap) / 2
+      const h = H - MY + 0.2 - top - capH
+      imgs.forEach((im, i) => {
+        const x = MX + i * (w + gap)
+        renderImage(ctx, im, { x, y: top, w, h }, { radius: ctx.theme.radius })
+        if (im.alt) text(ctx, { id: `${im.id}-cap`, role: 'small', text: im.alt, x, y: top + h + 0.12, w, h: capH - 0.1, max: 13, maxLines: 2 })
+      })
     }
   },
   {
@@ -291,7 +312,7 @@ export const LAYOUTS: Layout[] = [
   {
     id: 'stat-hero',
     name: 'Giant number',
-    zone: 'right',
+    zone: 'corner',
     score: (s) => (s.n.stat === 1 && only(s, 'stat', 'text', 'bullets') ? 10 : 0),
     render(ctx) {
       const st = one(ctx, 'stat')!
@@ -314,7 +335,7 @@ export const LAYOUTS: Layout[] = [
   {
     id: 'quote-image',
     name: 'Quote + portrait',
-    zone: 'left',
+    zone: 'corner',
     score: (s) => (s.n.quote === 1 && s.n.image === 1 && only(s, 'quote', 'image') ? 11 : 0),
     render(ctx) {
       renderImage(ctx, one(ctx, 'image')!, { x: W * 0.6, y: 0, w: W * 0.4, h: H })
@@ -333,7 +354,7 @@ export const LAYOUTS: Layout[] = [
       renderChart(ctx, one(ctx, 'chart')!, { x: MX - 0.1, y: top, w: 7.4, h })
       const cx = MX + 7.7
       const box = { x: cx, y: top, w: W - MX - cx, h }
-      card(ctx, box)
+      card(ctx, 'side-card', box)
       const st = one(ctx, 'stat')
       if (st) {
         const sh = Math.min(2.8, box.h * 0.55)
@@ -358,7 +379,7 @@ export const LAYOUTS: Layout[] = [
   {
     id: 'timeline',
     name: 'Timeline',
-    zone: 'bottom',
+    zone: 'corner',
     score: (s) => (s.n.timeline === 1 && only(s, 'timeline') ? 10 : 0),
     render(ctx) {
       const bottom = header(ctx, { x: MX, y: MY, w: W - MX * 2 - 2, h: 2.2 })
@@ -384,7 +405,7 @@ export const LAYOUTS: Layout[] = [
   {
     id: 'features-side',
     name: 'Features beside title',
-    zone: 'left',
+    zone: 'corner',
     score: (s) => (s.n.features === 1 && s.n.title && only(s, 'features') ? 7.5 : 0),
     render(ctx) {
       header(ctx, { x: MX, y: MY, w: 4.4, h: H - MY * 2, anchor: 'middle', max: 44 })
@@ -450,17 +471,6 @@ export const LAYOUTS: Layout[] = [
   }
 ]
 
-function card(ctx: Ctx, box: Box): void {
-  ctx.els.push({
-    kind: 'shape',
-    id: 'side-card',
-    ...box,
-    shape: ctx.theme.radius ? 'roundRect' : 'rect',
-    radius: ctx.theme.radius,
-    fill: ctx.theme.card.fill,
-    line: ctx.theme.card.line
-  })
-}
 
 export function getLayout(id: string): Layout | undefined {
   return LAYOUTS.find((l) => l.id === id)

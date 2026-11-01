@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { temporal } from 'zundo'
-import { type Block, type BlockType, type Deck, newBlock, newDeck, newSlide, type Slide, uid } from '@core/model'
+import { type Block, type BlockType, type Deck, newBlock, newDeck, newSlide, type Slide, type ThemeCustom, uid } from '@core/model'
 import { candidates, resolveLayouts } from '@core/layout/engine'
 
 export type View = 'edit' | 'outline'
@@ -17,6 +17,8 @@ interface State {
   setDeck(deck: Deck): void
   setTitle(title: string): void
   setTheme(id: string): void
+  setCustom(patch: Partial<ThemeCustom>): void
+  resetCustom(): void
   select(i: number): void
   setView(v: View): void
   setFocusBlock(id: string | null): void
@@ -66,7 +68,14 @@ export const useStore = create<State>()(
         },
         setDeck: (deck) => edit(deck, { current: Math.min(get().current, Math.max(0, deck.slides.length - 1)) }),
         setTitle: (title) => edit({ ...get().deck, title }),
-        setTheme: (themeId) => edit({ ...get().deck, themeId }),
+        // switching theme starts from that theme's own look
+        setTheme: (themeId) => edit({ ...get().deck, themeId, custom: undefined }),
+        setCustom: (patch) => {
+          const custom: ThemeCustom = { ...get().deck.custom, ...patch }
+          for (const k of Object.keys(custom) as (keyof ThemeCustom)[]) if (custom[k] === undefined) delete custom[k]
+          edit({ ...get().deck, custom: Object.keys(custom).length ? custom : undefined })
+        },
+        resetCustom: () => edit({ ...get().deck, custom: undefined }),
         select: (i) => set({ current: Math.max(0, Math.min(get().deck.slides.length - 1, i)), focusBlock: null }),
         setView: (view) => set({ view }),
         setFocusBlock: (focusBlock) => set({ focusBlock }),

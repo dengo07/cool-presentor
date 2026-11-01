@@ -1,6 +1,9 @@
 import type { Color, Fill } from './scene'
+import type { Deck, ThemeCustom } from './model'
+import { FONTS, hasBoldFace } from './fonts'
+import { contrast, isDark, mix, readableOn } from './color'
 
-export type DecoStyle = 'aurora' | 'orbs' | 'grid' | 'lines' | 'blocks'
+export type DecoStyle = 'aurora' | 'orbs' | 'grid' | 'lines' | 'blocks' | 'none'
 
 export interface Theme {
   id: string
@@ -14,7 +17,8 @@ export interface Theme {
   accents: [Color, Color, Color]
   onAccent: Color
   highlight: Fill // used for *highlighted* words
-  card: { fill: Fill; line?: { color: Color; alpha: number; width: number }; shadow?: boolean }
+  /** rule: editorial panels with a hairline across the top instead of an outline */
+  card: { fill: Fill; line?: { color: Color; alpha: number; width: number }; shadow?: boolean; rule?: boolean }
   heading: { font: string; bold: boolean; tracking: number; lineHeight: number; upper?: boolean }
   body: { font: string }
   label: { font: string; upper: boolean; tracking: number }
@@ -31,6 +35,26 @@ const lin = (angle: number, ...colors: Color[]): Fill => ({
 })
 
 export const THEMES: Theme[] = [
+  {
+    id: 'atlas',
+    name: 'Atlas',
+    tagline: 'Photo-led editorial, like a magazine feature',
+    dark: false,
+    bg: solid('F4F1EA'),
+    bgColor: 'F4F1EA',
+    text: '161616',
+    muted: '5E5A52',
+    accents: ['0E6B4A', 'B7791F', '1D4E89'],
+    onAccent: 'FFFFFF',
+    highlight: solid('0E6B4A'),
+    card: { fill: solid('161616', 0.045), rule: true },
+    heading: { font: 'Fraunces', bold: false, tracking: -0.6, lineHeight: 1.02 },
+    body: { font: 'Inter' },
+    label: { font: 'Inter', upper: true, tracking: 2 },
+    deco: 'none',
+    radius: 0,
+    chartColors: ['0E6B4A', 'B7791F', '1D4E89', '8C8578', 'C9B98F']
+  },
   {
     id: 'aurora',
     name: 'Midnight Aurora',
@@ -219,6 +243,77 @@ export const THEMES: Theme[] = [
 
 export function getTheme(id: string): Theme {
   return THEMES.find((t) => t.id === id) ?? THEMES[0]
+}
+
+/**
+ * Applies a deck's customisations to its theme. Colours that were derived
+ * from the replaced ones (highlights, card outlines, chart colours,
+ * decorations) follow automatically, and muted text / card fills are
+ * re-derived so everything stays readable.
+ */
+export function customizeTheme(base: Theme, c: ThemeCustom | undefined): Theme {
+  if (!c || !Object.keys(c).length) return base
+  const t: Theme = structuredClone(base)
+  const remap = new Map<string, string>()
+
+  // (accents that double as the text/background colour are left alone in the remap)
+  const neutral = new Set([base.text.toUpperCase(), base.bgColor.toUpperCase()])
+  if (c.accents) base.accents.forEach((a, i) => !neutral.has(a.toUpperCase()) && remap.set(a.toUpperCase(), c.accents![i].toUpperCase()))
+  const bg = c.bg?.toUpperCase()
+  if (bg) {
+    remap.set(base.bgColor.toUpperCase(), bg)
+    t.bgColor = bg
+    t.dark = isDark(bg)
+    t.bg = c.bgGradient
+      ? { kind: 'linear', angle: 135, stops: [{ pos: 0, color: bg }, { pos: 100, color: mix(bg, c.accents?.[0] ?? base.accents[0], t.dark ? 0.22 : 0.12) }] }
+      : { kind: 'solid', color: bg }
+  } else if (c.bgGradient !== undefined) {
+    t.bg = c.bgGradient
+      ? { kind: 'linear', angle: 135, stops: [{ pos: 0, color: base.bgColor }, { pos: 100, color: mix(base.bgColor, c.accents?.[0] ?? base.accents[0], base.dark ? 0.22 : 0.12) }] }
+      : { kind: 'solid', color: base.bgColor }
+  }
+  // text: explicit, or keep the theme's if still readable, else auto
+  let text = c.text?.toUpperCase() ?? base.text
+  if (!c.text && contrast(text, t.bgColor) < 4.5) text = readableOn(t.bgColor, 'F5F5F5', '161616')
+  if (text !== base.text) remap.set(base.text.toUpperCase(), text)
+
+  // recolour every derived colour in the theme (except bg, handled above)
+  const visit = (v: unknown): unknown => {
+    if (typeof v === 'string') return remap.get(v.toUpperCase()) ?? v
+    if (Array.isArray(v)) return v.map(visit)
+    if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, visit(x)]))
+    return v
+  }
+  const bgFill = t.bg
+  const bgColor = t.bgColor
+  Object.assign(t, visit({ ...t, bg: undefined, bgColor: undefined }))
+  t.bg = bgFill
+  t.bgColor = bgColor
+  t.text = text
+  if (c.accents) t.accents = c.accents.map((x) => x.toUpperCase()) as Theme['accents']
+
+  if (bg || c.text) {
+    t.muted = mix(text, t.bgColor, 0.38)
+    // opaque card fills were tuned for the old background – derive new ones
+    if (t.card.fill.kind === 'solid' && (t.card.fill.alpha ?? 1) >= 1) t.card.fill = { kind: 'solid', color: mix(t.bgColor, text, 0.06) }
+  }
+  if (c.accents) t.onAccent = readableOn(t.accents[0])
+
+  if (c.headingFont && FONTS[c.headingFont]) t.heading = { ...t.heading, font: c.headingFont }
+  if (c.headingBold !== undefined) t.heading = { ...t.heading, bold: c.headingBold }
+  if (!hasBoldFace(t.heading.font)) t.heading = { ...t.heading, bold: false }
+  if (c.bodyFont && FONTS[c.bodyFont]) {
+    t.body = { font: c.bodyFont }
+    if (base.label.font === base.body.font) t.label = { ...t.label, font: c.bodyFont }
+  }
+  if (c.radius !== undefined) t.radius = c.radius
+  if (c.deco) t.deco = c.deco
+  return t
+}
+
+/** The effective theme of a deck (base theme + customisations). */
+export function deckTheme(deck: Pick<Deck, 'themeId' | 'custom'>): Theme {
+  return customizeTheme(getTheme(deck.themeId), deck.custom)
 }
 
 /** All font families a theme needs (for loading / embedding). */

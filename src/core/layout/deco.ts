@@ -107,6 +107,8 @@ export function decorate(ctx: Ctx, zone: Zone): El[] {
   const k = t.dark ? 1 : 0.7
 
   switch (t.deco) {
+    case 'none':
+      break
     case 'aurora':
       // soft radial glows; the squares are invisible at their edges
       els.push(sq('deco-0', sp[0], glow(a0, 0.6 * k), 2.6))
