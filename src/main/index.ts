@@ -5,7 +5,9 @@ import { basename, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describeSlide, aiDeckToSlides, aiSlideToBlocks } from '../core/ai-schema'
 import type { Deck, Slide } from '../core/model'
-import { friendlyError, generateDeck, improveSlide, rewriteText, setApiKey, speakerNotes } from './ai'
+import { friendlyError, generateDeck, improveSlide, type Provider, rewriteText, setApiKey, setEngine, speakerNotes } from './ai'
+import { type ClaudeCodeInfo, detectClaudeCode } from './claude-code'
+import { addDocument, type AttachmentInfo, DOC_EXTENSIONS, getDocuments, removeDocument } from './documents'
 
 const here = fileURLToPath(new URL('.', import.meta.url))
 let win: BrowserWindow | null = null
@@ -15,6 +17,9 @@ let dirty = false
 interface Settings {
   apiKey?: string // encrypted (base64) when safeStorage is available
   apiKeyPlain?: boolean
+  provider?: Provider // unset = Claude Code when installed, else API
+  claudePath?: string // manual override for the Claude Code CLI
+  claudeModel?: string // '' = Claude Code's default
 }
 const settingsPath = (): string => join(app.getPath('userData'), 'settings.json')
 
@@ -35,8 +40,13 @@ function storedKey(): string | undefined {
     return undefined
   }
 }
+function saveSettings(patch: Partial<Settings>): void {
+  const s: Settings = { ...loadSettings(), ...patch }
+  for (const k of Object.keys(s) as (keyof Settings)[]) if (s[k] === undefined || s[k] === '') delete s[k]
+  writeFileSync(settingsPath(), JSON.stringify(s), { mode: 0o600 })
+}
 function saveKey(key: string): void {
-  const s: Settings = {}
+  const s: Settings = { ...loadSettings(), apiKey: undefined, apiKeyPlain: undefined }
   if (key) {
     if (safeStorage.isEncryptionAvailable()) s.apiKey = safeStorage.encryptString(key).toString('base64')
     else {
@@ -44,8 +54,39 @@ function saveKey(key: string): void {
       s.apiKeyPlain = true
     }
   }
-  writeFileSync(settingsPath(), JSON.stringify(s), { mode: 0o600 })
+  saveSettings(s)
   setApiKey(key)
+}
+
+// ---------------------------------------------------------------- AI engine
+let claude: ClaudeCodeInfo = { found: false }
+
+/** Detects Claude Code and points the AI module at the chosen engine. */
+async function applyEngine(): Promise<void> {
+  const s = loadSettings()
+  claude = await detectClaudeCode(s.claudePath || undefined)
+  setEngine({
+    provider: s.provider ?? (claude.found ? 'claude-code' : 'api'),
+    claudePath: claude.path,
+    claudeModel: s.claudeModel || undefined,
+    workdir: join(app.getPath('userData'), 'claude-code-workdir')
+  })
+}
+
+function engineStatus(): Record<string, unknown> {
+  const s = loadSettings()
+  const k = storedKey() ?? ''
+  const hasKey = !!k || !!process.env['ANTHROPIC_API_KEY']
+  const provider: Provider = s.provider ?? (claude.found ? 'claude-code' : 'api')
+  return {
+    provider,
+    ready: provider === 'claude-code' ? claude.found : hasKey,
+    hasKey,
+    keyHint: k ? `…${k.slice(-4)}` : process.env['ANTHROPIC_API_KEY'] ? 'from environment' : '',
+    claude,
+    claudeModel: s.claudeModel ?? '',
+    claudePath: s.claudePath ?? ''
+  }
 }
 
 // ---------------------------------------------------------------- window
@@ -212,7 +253,8 @@ function registerIpc(): void {
   })
 
   const autosavePath = (): string => join(app.getPath('userData'), 'autosave.cpres')
-  ipcMain.handle('deck:autosave', (_e, json: string) => writeFile(autosavePath(), json, 'utf8'))
+  // Scripted snapshot runs (dev harness) must never overwrite the user's session.
+  ipcMain.handle('deck:autosave', (_e, json: string) => (process.env['CP_SNAPSHOT'] ? undefined : writeFile(autosavePath(), json, 'utf8')))
   ipcMain.handle('deck:restore', async () => (existsSync(autosavePath()) ? readFile(autosavePath(), 'utf8') : null))
 
   ipcMain.handle('shell:open', (_e, path: string) => shell.openPath(path))
@@ -222,15 +264,36 @@ function registerIpc(): void {
     win?.setTitle(`${path ? basename(path) : title} — Cool Presentor`)
   })
 
-  ipcMain.handle('settings:get', () => {
-    const k = storedKey() ?? ''
-    return { hasKey: !!k || !!process.env['ANTHROPIC_API_KEY'], keyHint: k ? `…${k.slice(-4)}` : process.env['ANTHROPIC_API_KEY'] ? 'from environment' : '' }
-  })
+  ipcMain.handle('settings:get', () => engineStatus())
   ipcMain.handle('settings:setKey', (_e, key: string) => saveKey(key.trim()))
+  ipcMain.handle('settings:setEngine', async (_e, patch: { provider?: Provider; claudeModel?: string; claudePath?: string }) => {
+    saveSettings(patch)
+    await applyEngine()
+    return engineStatus()
+  })
+  ipcMain.handle('ai:test', () => wrap(() => rewriteText('Welcome to our quarterly update presentation', 'make it shorter')))
 
-  ipcMain.handle('ai:deck', (_e, prompt: string, count: number) =>
+  // Documents: read in the main process, only summaries go to the renderer.
+  const addAll = async (paths: string[]): Promise<(AttachmentInfo | { name: string; error: string })[]> =>
+    Promise.all(
+      paths.map((p) =>
+        addDocument(p).catch((e: unknown) => ({ name: basename(p), error: e instanceof Error ? e.message : String(e) }))
+      )
+    )
+  ipcMain.handle('docs:pick', async () => {
+    const r = await dialog.showOpenDialog(win!, {
+      title: 'Attach documents',
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Documents', extensions: DOC_EXTENSIONS }]
+    })
+    return r.canceled ? [] : addAll(r.filePaths)
+  })
+  ipcMain.handle('docs:add', (_e, paths: string[]) => addAll(paths))
+  ipcMain.handle('docs:remove', (_e, id: string) => removeDocument(id))
+
+  ipcMain.handle('ai:deck', (_e, prompt: string, count: number, docIds: string[] = []) =>
     wrap(async () => {
-      const d = await generateDeck(prompt, count)
+      const d = await generateDeck(prompt, count, getDocuments(docIds))
       return { title: d.title.replace(/\*/g, ''), slides: aiDeckToSlides(d) }
     })
   )
@@ -249,8 +312,9 @@ function registerIpc(): void {
   ipcMain.handle('ai:rewrite', (_e, text: string, instruction: string) => wrap(() => rewriteText(text, instruction)))
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   setApiKey(storedKey())
+  await applyEngine()
   registerIpc()
   buildMenu()
   createWindow()

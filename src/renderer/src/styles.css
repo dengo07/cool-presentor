@@ -1113,3 +1113,111 @@ input[type='range'] {
 .callout {
   margin-bottom: 12px;
 }
+
+/* ---------------------------------------------------------------- settings: AI engine */
+.engine-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.engine {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  text-align: left;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line2);
+  background: var(--panel2);
+  cursor: pointer;
+}
+.engine div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.engine span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.engine.on {
+  border-color: var(--accent);
+  background: rgba(139, 123, 255, 0.12);
+}
+.engine-panel {
+  margin-top: 6px;
+}
+.status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 12px 0 0;
+  flex-wrap: wrap;
+}
+.status code {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.status.ok svg {
+  color: var(--ok);
+}
+.status.bad {
+  color: #ffb86b;
+}
+.row.tight {
+  margin-top: 0;
+}
+.hint.err {
+  color: var(--danger);
+}
+
+/* ---------------------------------------------------------------- AI dialog: documents */
+.doc-drop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px dashed var(--line2);
+  border-radius: 10px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.doc-drop.over {
+  border-color: var(--accent);
+  background: rgba(139, 123, 255, 0.08);
+}
+.doc-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 6px 6px 6px 10px;
+  border-radius: 9px;
+  background: var(--panel2);
+  border: 1px solid var(--line2);
+}
+.doc-chip > svg {
+  color: var(--accent);
+  flex: none;
+}
+.doc-chip div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.doc-chip strong {
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+}
+.doc-chip span {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.doc-chip em {
+  color: #ffb86b;
+  font-style: normal;
+}

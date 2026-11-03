@@ -1,7 +1,28 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { Deck, Slide, Block } from '../core/model'
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: string }
+
+export interface DocInfo {
+  id: string
+  name: string
+  kind: 'pdf' | 'docx' | 'pptx' | 'text'
+  pages?: number
+  chars: number
+  warning?: string
+}
+export type DocResult = DocInfo | { name: string; error: string }
+
+export interface EngineStatus {
+  provider: 'claude-code' | 'api'
+  /** the chosen engine is usable */
+  ready: boolean
+  hasKey: boolean
+  keyHint: string
+  claude: { found: boolean; path?: string; version?: string }
+  claudeModel: string
+  claudePath: string
+}
 
 const api = {
   openDeck: (): Promise<{ path: string; json: string } | null> => ipcRenderer.invoke('deck:open'),
@@ -14,15 +35,25 @@ const api = {
   revealPath: (path: string): Promise<void> => ipcRenderer.invoke('shell:reveal', path),
   setDirty: (dirty: boolean): void => ipcRenderer.send('app:dirty', dirty),
   setTitle: (path: string | null, title: string): void => ipcRenderer.send('app:title', path, title),
-  getSettings: (): Promise<{ hasKey: boolean; keyHint: string }> => ipcRenderer.invoke('settings:get'),
+  getSettings: (): Promise<EngineStatus> => ipcRenderer.invoke('settings:get'),
   setApiKey: (key: string): Promise<void> => ipcRenderer.invoke('settings:setKey', key),
+  setEngine: (patch: { provider?: 'claude-code' | 'api'; claudeModel?: string; claudePath?: string }): Promise<EngineStatus> =>
+    ipcRenderer.invoke('settings:setEngine', patch),
   ai: {
-    deck: (prompt: string, count: number): Promise<Result<{ title: string; slides: Slide[] }>> =>
-      ipcRenderer.invoke('ai:deck', prompt, count),
+    deck: (prompt: string, count: number, docIds: string[] = []): Promise<Result<{ title: string; slides: Slide[] }>> =>
+      ipcRenderer.invoke('ai:deck', prompt, count, docIds),
     slide: (slide: Slide, instruction: string, deckTitle: string): Promise<Result<{ blocks: Block[]; notes: string }>> =>
       ipcRenderer.invoke('ai:slide', slide, instruction, deckTitle),
     notes: (deck: Deck): Promise<Result<string[]>> => ipcRenderer.invoke('ai:notes', deck),
-    rewrite: (text: string, instruction: string): Promise<Result<string>> => ipcRenderer.invoke('ai:rewrite', text, instruction)
+    rewrite: (text: string, instruction: string): Promise<Result<string>> => ipcRenderer.invoke('ai:rewrite', text, instruction),
+    test: (): Promise<Result<string>> => ipcRenderer.invoke('ai:test')
+  },
+  docs: {
+    pick: (): Promise<DocResult[]> => ipcRenderer.invoke('docs:pick'),
+    add: (paths: string[]): Promise<DocResult[]> => ipcRenderer.invoke('docs:add', paths),
+    remove: (id: string): Promise<void> => ipcRenderer.invoke('docs:remove', id),
+    /** Absolute path of a dropped File (needed since Electron 32). */
+    pathFor: (file: File): string => webUtils.getPathForFile(file)
   },
   onMenu: (cb: (action: string) => void): (() => void) => {
     const fn = (_e: unknown, action: string): void => cb(action)

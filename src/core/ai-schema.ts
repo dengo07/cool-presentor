@@ -33,7 +33,7 @@ export const AiSlide = z.object({
       right: z.object({ title: z.string(), items: z.array(z.string()) })
     })
     .nullable(),
-  wantsImage: z.boolean().describe('True if a photo would make this slide stronger (user adds it later)'),
+  wantsImage: z.boolean().describe('True only if a photo would clearly make this slide stronger (the user adds it later). Use on at most 2-3 slides per deck.'),
   notes: z.string().describe('Speaker notes: 2-4 natural sentences')
 })
 

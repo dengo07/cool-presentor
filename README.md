@@ -29,7 +29,10 @@ Cool Presentor is a desktop app where you never push boxes around. You type what
 4. **Duplicate & morph** (`Ctrl+D`). This duplicates a slide into a new layout. Because the elements keep their identity, PowerPoint's Morph animates between the two.
 5. **Present** (`F5`) right in the app, with the same morph-style animation, or **Export .pptx** (`Ctrl+E`).
 6. **AI (optional).**
-   - **Generate** writes a whole deck from a brief.
+   - **Generate** writes a whole deck from a brief, or from **attached documents**: PDF, Word, PowerPoint, text, Markdown, CSV or HTML. Click *Attach documents* or drop files into the dialog.
+     - Old PowerPoint files can be redesigned this way.
+     - The document's facts and numbers are used, and sources are mentioned in the speaker notes.
+     - With the API engine, PDFs are sent as PDFs, so Claude also sees charts and tables.
    - The slide **AI** menu punches up, shortens or "makes visual" a slide.
    - The wand buttons rewrite a single block.
    - **Settings** writes speaker notes for every slide.
@@ -51,7 +54,14 @@ npm run typecheck
 npm run dist         # package (AppImage on Linux, dmg on macOS, nsis on Windows)
 ```
 
-AI features need an Anthropic API key. Paste it in **Settings** (stored encrypted with Electron `safeStorage`), or set `ANTHROPIC_API_KEY`. They use Claude Opus 5.5 with structured outputs and server-side refusal fallbacks (`fallbacks: "default"`).
+AI features can use one of two engines, chosen in **Settings → AI engine**:
+
+- **Claude Code (local, default when installed).** Runs your installed `claude` CLI in print mode, so it uses your Claude Code login and plan, with no API key needed.
+  - It runs with all tools, MCP servers and settings disabled, with no saved session, in an empty folder, so it can only return slide text.
+  - The app auto-detects the CLI, even when started from the desktop with a minimal `PATH`. You can also set a path by hand and pick Opus, Sonnet or Haiku.
+- **Anthropic API key.** Paste it in Settings (stored encrypted with Electron `safeStorage`), or set `ANTHROPIC_API_KEY`. Uses Claude Opus 5.5 with structured outputs and server-side refusal fallbacks (`fallbacks: "default"`).
+
+**Test connection** in Settings checks that the chosen engine answers.
 
 ### Architecture
 

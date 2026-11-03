@@ -90,7 +90,9 @@ export function renderImage(ctx: Ctx, b: BlockOf<'image'>, box: Box, o: { radius
       o.radius ?? 0
     )
     const s = Math.min(box.w, box.h) * 0.18
-    add(ctx, { kind: 'icon', id: `${b.id}-ph`, icon: 'ImagePlus', color: t.text, stroke: 1.5, x: box.x + box.w / 2 - s / 2, y: box.y + box.h / 2 - s / 2, w: s, h: s })
+    // full-bleed boxes carry text in their lower half – keep the icon in the upper part
+    const cy = box.w > 9 ? box.y + box.h * 0.26 : box.y + box.h / 2
+    add(ctx, { kind: 'icon', id: `${b.id}-ph`, icon: 'ImagePlus', color: t.text, stroke: 1.5, x: box.x + box.w / 2 - s / 2, y: cy - s / 2, w: s, h: s })
     return
   }
   add(ctx, {

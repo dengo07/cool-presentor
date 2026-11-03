@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { KeyRound, Sparkles, X } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, FileText, KeyRound, Loader2, Paperclip, Sparkles, Terminal, X, Zap } from 'lucide-react'
+import type { DocInfo, DocResult, EngineStatus } from '../../../preload'
 import { useStore } from '../store'
 import { useUi } from '../ui'
 import { ThemeStudio } from './ThemeStudio'
@@ -47,17 +48,49 @@ function AiDialog({ onClose }: { onClose: () => void }): React.JSX.Element {
   const [prompt, setPrompt] = useState('')
   const [count, setCount] = useState(10)
   const [mode, setMode] = useState<'replace' | 'append'>('replace')
-  const [hasKey, setHasKey] = useState<boolean | null>(null)
+  const [engine, setEngine] = useState<EngineStatus | null>(null)
+  const [docs, setDocs] = useState<DocInfo[]>([])
+  const [reading, setReading] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
   useEffect(() => {
-    window.api.getSettings().then((s) => setHasKey(s.hasKey))
+    window.api.getSettings().then(setEngine)
   }, [])
+  const notReady = engine !== null && !engine.ready
+
+  const addResults = (results: DocResult[]): void => {
+    const ok = results.filter((r): r is DocInfo => 'id' in r)
+    setDocs((d) => [...d, ...ok])
+    for (const r of results) if ('error' in r) useUi.getState().toast({ kind: 'error', text: `${r.name}: ${r.error}` }, 7000)
+  }
+  const pick = async (): Promise<void> => {
+    setReading(true)
+    addResults(await window.api.docs.pick())
+    setReading(false)
+  }
+  const drop = async (files: FileList): Promise<void> => {
+    const paths = [...files].map((f) => window.api.docs.pathFor(f)).filter(Boolean)
+    if (!paths.length) return
+    setReading(true)
+    addResults(await window.api.docs.add(paths))
+    setReading(false)
+  }
+  const removeDoc = (id: string): void => {
+    window.api.docs.remove(id)
+    setDocs((d) => d.filter((x) => x.id !== id))
+  }
+  // closing without generating forgets the documents
+  const cancel = (): void => {
+    for (const d of docs) window.api.docs.remove(d.id)
+    onClose()
+  }
 
   const go = async (): Promise<void> => {
     const ui = useUi.getState()
     onClose()
-    ui.setBusy(`Claude is writing ${count} slides…`)
-    const r = await window.api.ai.deck(prompt, count)
+    ui.setBusy(docs.length ? `Claude is reading ${docs.length === 1 ? 'your document' : `${docs.length} documents`} and writing ${count} slides…` : `Claude is writing ${count} slides…`)
+    const r = await window.api.ai.deck(prompt, count, docs.map((d) => d.id))
     ui.setBusy(null)
+    for (const d of docs) window.api.docs.remove(d.id)
     if (!r.ok) return ui.toast({ kind: 'error', text: r.error }, 8000)
     const st = useStore.getState()
     if (mode === 'replace') {
@@ -71,28 +104,63 @@ function AiDialog({ onClose }: { onClose: () => void }): React.JSX.Element {
   }
 
   return (
-    <Modal title="Generate a deck with Claude" onClose={onClose}>
-      {hasKey === false && (
+    <Modal title="Generate a deck with Claude" onClose={cancel}>
+      {notReady && (
         <div className="callout">
-          <KeyRound size={16} /> Add your Anthropic API key in{' '}
+          <KeyRound size={16} />
+          {engine.provider === 'claude-code' ? 'Claude Code was not found on this computer.' : 'Add your Anthropic API key to use AI features.'}
           <button className="link" onClick={() => useUi.getState().open('settings')}>
-            Settings
-          </button>{' '}
-          to use AI features.
+            Open Settings
+          </button>
         </div>
       )}
       <label className="field-label">What is your presentation about?</label>
       <textarea
         className="ai-prompt"
         autoFocus
-        rows={6}
+        rows={docs.length ? 3 : 6}
         value={prompt}
-        placeholder="Paste notes, an outline, a document – or just describe the talk and the audience."
+        placeholder={
+          docs.length
+            ? 'Optional: who is the audience, what should the deck focus on, how long is the talk?'
+            : 'Paste notes, an outline – or just describe the talk and the audience. You can also attach documents below.'
+        }
         onChange={(e) => setPrompt(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && prompt.trim()) go()
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && (prompt.trim() || docs.length)) go()
         }}
       />
+      <div
+        className={'doc-drop' + (dragOver ? ' over' : '')}
+        onDragOver={(e) => (e.preventDefault(), setDragOver(true))}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setDragOver(false)
+          drop(e.dataTransfer.files)
+        }}
+      >
+        {docs.map((d) => (
+          <div key={d.id} className="doc-chip" title={d.warning}>
+            <FileText size={15} />
+            <div>
+              <strong>{d.name}</strong>
+              <span>
+                {d.pages ? `${d.pages} ${d.kind === 'pptx' ? 'slides' : 'pages'} · ` : ''}
+                {d.chars >= 1000 ? `${Math.round(d.chars / 1000)}k` : d.chars} characters
+                {d.warning && <em> · {d.warning}</em>}
+              </span>
+            </div>
+            <button className="icon-btn xs" onClick={() => removeDoc(d.id)} title="Remove">
+              <X size={12} />
+            </button>
+          </div>
+        ))}
+        <button className="btn sm ghost" onClick={pick} disabled={reading}>
+          {reading ? <Loader2 size={14} className="spin" /> : <Paperclip size={14} />} {reading ? 'Reading…' : 'Attach documents'}
+        </button>
+        <span className="hint">PDF, Word, PowerPoint, text or Markdown – or drop files here</span>
+      </div>
       <div className="ideas">
         {IDEAS.map((i) => (
           <button key={i} className="chip" onClick={() => setPrompt(i)}>
@@ -115,8 +183,9 @@ function AiDialog({ onClose }: { onClose: () => void }): React.JSX.Element {
         </div>
       </div>
       <div className="modal-foot">
-        <span className="hint">Uses Claude Opus 5.5 · Ctrl+Enter</span>
-        <button className="btn primary" disabled={!prompt.trim() || hasKey === false} onClick={go}>
+        <span className="hint">{engineLabel(engine)} · Ctrl+Enter</span>
+        <div className="spacer" />
+        <button className="btn primary" disabled={(!prompt.trim() && !docs.length) || notReady || reading} onClick={go}>
           <Sparkles size={16} /> Generate
         </button>
       </div>
@@ -124,16 +193,44 @@ function AiDialog({ onClose }: { onClose: () => void }): React.JSX.Element {
   )
 }
 
+function engineLabel(e: EngineStatus | null): string {
+  if (!e) return ''
+  if (e.provider === 'claude-code') return `Uses your local Claude Code${e.claudeModel ? ` (${e.claudeModel})` : ''}`
+  return 'Uses the Anthropic API (Claude Opus 5.5)'
+}
+
+const CLAUDE_MODELS = [
+  { id: '', label: 'Default' },
+  { id: 'opus', label: 'Opus' },
+  { id: 'sonnet', label: 'Sonnet' },
+  { id: 'haiku', label: 'Haiku' }
+]
+
 function SettingsDialog({ onClose }: { onClose: () => void }): React.JSX.Element {
+  const [st, setSt] = useState<EngineStatus | null>(null)
   const [key, setKey] = useState('')
-  const [hint, setHint] = useState('')
+  const [path, setPath] = useState('')
+  const [testing, setTesting] = useState<string | null>(null)
   useEffect(() => {
-    window.api.getSettings().then((s) => setHint(s.keyHint))
+    window.api.getSettings().then((s) => {
+      setSt(s)
+      setPath(s.claudePath)
+    })
   }, [])
-  const save = async (): Promise<void> => {
+  const update = async (patch: Parameters<typeof window.api.setEngine>[0]): Promise<void> => {
+    setTesting(null)
+    setSt(await window.api.setEngine(patch))
+  }
+  const saveKey = async (): Promise<void> => {
     await window.api.setApiKey(key)
+    setKey('')
+    setSt(await window.api.getSettings())
     useUi.getState().toast({ kind: 'success', text: key ? 'API key saved' : 'API key removed' })
-    onClose()
+  }
+  const test = async (): Promise<void> => {
+    setTesting('Testing…')
+    const r = await window.api.ai.test()
+    setTesting(r.ok ? `✓ Works – Claude answered: “${r.data}”` : `✗ ${r.error}`)
   }
   const notes = async (): Promise<void> => {
     const ui = useUi.getState()
@@ -142,25 +239,93 @@ function SettingsDialog({ onClose }: { onClose: () => void }): React.JSX.Element
     const r = await window.api.ai.notes(useStore.getState().deck)
     ui.setBusy(null)
     if (!r.ok) return ui.toast({ kind: 'error', text: r.error }, 8000)
-    const st = useStore.getState()
-    st.setDeck({ ...st.deck, slides: st.deck.slides.map((s, i) => ({ ...s, notes: r.data[i] ?? s.notes })) })
+    const s = useStore.getState()
+    s.setDeck({ ...s.deck, slides: s.deck.slides.map((sl, i) => ({ ...sl, notes: r.data[i] ?? sl.notes })) })
     ui.toast({ kind: 'success', text: 'Speaker notes written for every slide' })
   }
+  if (!st) return <Modal title="Settings" onClose={onClose}>{null}</Modal>
+
   return (
     <Modal title="Settings" onClose={onClose}>
-      <label className="field-label">Anthropic API key {hint && <span className="hint">(current: {hint})</span>}</label>
-      <input type="password" value={key} placeholder="sk-ant-…" onChange={(e) => setKey(e.target.value)} autoFocus />
-      <p className="hint">
-        Stored encrypted on this computer and only sent to the Anthropic API. Leave empty and save to remove. Without a key, the app falls back to the
-        ANTHROPIC_API_KEY environment variable.
-      </p>
+      <label className="field-label">AI engine</label>
+      <div className="engine-options">
+        <button className={'engine' + (st.provider === 'claude-code' ? ' on' : '')} onClick={() => update({ provider: 'claude-code' })}>
+          <Terminal size={18} />
+          <div>
+            <strong>Claude Code (local)</strong>
+            <span>Uses your Claude Code login – no API key needed</span>
+          </div>
+        </button>
+        <button className={'engine' + (st.provider === 'api' ? ' on' : '')} onClick={() => update({ provider: 'api' })}>
+          <KeyRound size={18} />
+          <div>
+            <strong>Anthropic API key</strong>
+            <span>Pay-as-you-go via the Claude API</span>
+          </div>
+        </button>
+      </div>
+
+      {st.provider === 'claude-code' ? (
+        <div className="engine-panel">
+          {st.claude.found ? (
+            <p className="status ok">
+              <CheckCircle2 size={15} /> Found {st.claude.version} <code>{st.claude.path}</code>
+            </p>
+          ) : (
+            <p className="status bad">
+              <AlertTriangle size={15} /> Claude Code was not found. Install it from claude.com/claude-code, or enter its path below.
+            </p>
+          )}
+          <label className="field-label">Model</label>
+          <div className="seg small">
+            {CLAUDE_MODELS.map((m) => (
+              <button key={m.id} className={st.claudeModel === m.id ? 'on' : ''} onClick={() => update({ claudeModel: m.id })}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+          <label className="field-label">Custom path to the claude executable (optional)</label>
+          <div className="row tight">
+            <input value={path} placeholder="Auto-detect" onChange={(e) => setPath(e.target.value)} spellCheck={false} />
+            <button className="btn sm" onClick={() => update({ claudePath: path.trim() })}>
+              Apply
+            </button>
+          </div>
+          <p className="hint">
+            Claude Code runs with all tools, plugins and MCP servers disabled, in an empty folder – it can only write slide text. Usage counts toward your
+            Claude plan.
+          </p>
+        </div>
+      ) : (
+        <div className="engine-panel">
+          <label className="field-label">Anthropic API key {st.keyHint && <span className="hint">(current: {st.keyHint})</span>}</label>
+          <div className="row tight">
+            <input type="password" value={key} placeholder="sk-ant-…" onChange={(e) => setKey(e.target.value)} />
+            <button className="btn sm" onClick={saveKey}>
+              Save key
+            </button>
+          </div>
+          <p className="hint">
+            Stored encrypted on this computer and only sent to the Anthropic API. Save an empty field to remove it. Without a key, the app falls back to
+            the ANTHROPIC_API_KEY environment variable.
+          </p>
+        </div>
+      )}
+
+      <div className="row">
+        <button className="btn sm" onClick={test} disabled={!st.ready || testing === 'Testing…'}>
+          {testing === 'Testing…' ? <Loader2 size={14} className="spin" /> : <Zap size={14} />} Test connection
+        </button>
+        {testing && <span className={'hint' + (testing.startsWith('✗') ? ' err' : '')}>{testing}</span>}
+      </div>
+
       <div className="modal-foot">
-        <button className="btn" onClick={notes}>
+        <button className="btn" onClick={notes} disabled={!st.ready}>
           <Sparkles size={15} /> Write speaker notes for whole deck
         </button>
         <div className="spacer" />
-        <button className="btn primary" onClick={save}>
-          Save key
+        <button className="btn primary" onClick={onClose}>
+          Done
         </button>
       </div>
     </Modal>
