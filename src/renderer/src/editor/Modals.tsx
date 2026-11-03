@@ -90,9 +90,21 @@ function AiDialog({ onClose }: { onClose: () => void }): React.JSX.Element {
     ui.setBusy(docs.length ? `Claude is reading ${docs.length === 1 ? 'your document' : `${docs.length} documents`} and writing ${count} slides…` : `Claude is writing ${count} slides…`)
     const r = await window.api.ai.deck(prompt, count, docs.map((d) => d.id))
     ui.setBusy(null)
+    // the documents become part of this deck's assistant memory
+    const kept = r.ok ? (await Promise.all(docs.map((d) => window.api.docs.read(d.id)))).filter((d) => d !== null) : []
     for (const d of docs) window.api.docs.remove(d.id)
     if (!r.ok) return ui.toast({ kind: 'error', text: r.error }, 8000)
     const st = useStore.getState()
+    const at = new Date().toISOString()
+    st.setAssistant((a) => ({
+      ...a,
+      docs: [...a.docs.filter((x) => !kept.some((k) => k.name === x.name)), ...kept],
+      history: [
+        ...a.history,
+        { role: 'user', at, text: `Generate ${count} slides${prompt.trim() ? `: ${prompt.trim()}` : ''}${kept.length ? ` (from ${kept.map((k) => k.name).join(', ')})` : ''}` },
+        { role: 'assistant', at, text: `Generated a ${mode === 'replace' ? 'new deck' : 'set of slides'}: ${r.data.slides.length} slides.` }
+      ]
+    }))
     if (mode === 'replace') {
       st.setDeck({ ...st.deck, title: r.data.title, slides: r.data.slides })
       st.select(0)

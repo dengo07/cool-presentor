@@ -158,7 +158,20 @@ function addShape(pptx: PptxGenJS, slide: PptxGenJS.Slide, el: ShapeEl, objectNa
       }
     : undefined
   if (el.shape === 'line') {
-    slide.addShape(pptx.ShapeType.line, { x: el.x, y: el.y, w: el.w, h: el.h, line, objectName })
+    // a negative w/h is a line drawn right-to-left / bottom-to-top: flip so arrowheads land on the right end
+    const arrows = el.arrow
+      ? { beginArrowType: el.arrow.start ? ('triangle' as const) : undefined, endArrowType: el.arrow.end ? ('triangle' as const) : undefined }
+      : {}
+    slide.addShape(pptx.ShapeType.line, {
+      x: Math.min(el.x, el.x + el.w),
+      y: Math.min(el.y, el.y + el.h),
+      w: Math.abs(el.w),
+      h: Math.abs(el.h),
+      flipH: el.w < 0 || undefined,
+      flipV: el.h < 0 || undefined,
+      line: line && { ...line, ...arrows },
+      objectName
+    })
     return
   }
   const type =

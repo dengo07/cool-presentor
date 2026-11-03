@@ -1,24 +1,52 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowDown, ArrowUp, ImagePlus, Plus, Sparkles, Trash2, Wand2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ImagePlus, PencilLine, Plus, Sparkles, Trash2, Wand2, X } from 'lucide-react'
+import { AssistantPanel } from './AssistantPanel'
 import { type Block, BLOCK_LABELS, type BlockOf, type BlockType, type ChartKind } from '@core/model'
 import { iconNames, iconSvg } from '@core/icons'
+import { DIAGRAM_HELP, diagramToText, textToDiagram } from '@core/diagram-text'
 import { useStore } from '../store'
 import { useUi } from '../ui'
 import { fileToImage } from '../lib/images'
 
-const ADDABLE: BlockType[] = ['eyebrow', 'title', 'subtitle', 'text', 'bullets', 'stat', 'image', 'chart', 'gantt', 'funnel', 'quote', 'features', 'timeline', 'comparison']
+const ADDABLE: BlockType[] = ['eyebrow', 'title', 'subtitle', 'text', 'bullets', 'stat', 'image', 'chart', 'diagram', 'gantt', 'funnel', 'quote', 'features', 'timeline', 'comparison']
 
-export function Inspector(): React.JSX.Element {
+/** Right panel: block editor or the deck assistant. */
+export function RightPanel(): React.JSX.Element {
+  const panel = useUi((s) => s.panel)
+  const setPanel = useUi((s) => s.setPanel)
+  const n = useStore((s) => s.assistant.history.length)
+  const tabs = (
+    <div className="panel-tabs">
+      <button className={panel === 'edit' ? 'on' : ''} onClick={() => setPanel('edit')}>
+        <PencilLine size={14} /> Edit
+      </button>
+      <button className={panel === 'assistant' ? 'on' : ''} onClick={() => setPanel('assistant')}>
+        <Sparkles size={14} /> Assistant{n > 0 && <span className="badge">{n}</span>}
+      </button>
+    </div>
+  )
+  if (panel === 'assistant')
+    return (
+      <aside className="inspector">
+        {tabs}
+        <AssistantPanel />
+      </aside>
+    )
+  return <Inspector tabs={tabs} />
+}
+
+export function Inspector({ tabs }: { tabs?: React.ReactNode }): React.JSX.Element {
   const slide = useStore((s) => s.deck.slides[s.current])
   const current = useStore((s) => s.current)
   const addBlock = useStore((s) => s.addBlock)
   const updateSlide = useStore((s) => s.updateSlide)
   const focusBlock = useStore((s) => s.focusBlock)
   const [menu, setMenu] = useState(false)
-  if (!slide) return <aside className="inspector" />
+  if (!slide) return <aside className="inspector">{tabs}</aside>
 
   return (
     <aside className="inspector">
+      {tabs}
       <div className="insp-head">
         <h3>Slide {current + 1}</h3>
         <AiSlideMenu />
@@ -249,6 +277,8 @@ function BlockEditor({ block }: { block: Block }): React.JSX.Element {
       )
     case 'gantt':
       return <GanttEditor block={block} />
+    case 'diagram':
+      return <DiagramEditor block={block} />
     case 'funnel':
       return (
         <>
@@ -274,6 +304,44 @@ const CHART_KINDS: { id: ChartKind; label: string }[] = [
   { id: 'donut', label: 'Donut' },
   { id: 'radar', label: 'Radar' }
 ]
+
+/** Diagrams are edited as text: one box or arrow per line (see DIAGRAM_HELP). */
+function DiagramEditor({ block }: { block: BlockOf<'diagram'> }): React.JSX.Element {
+  const up = useUpdate(block.id)
+  const [src, setSrc] = useState(() => diagramToText(block))
+  const [errors, setErrors] = useState<string[]>([])
+  // the block can change from outside (undo, AI edits): resync unless the text already describes it
+  const last = useRef(block)
+  useEffect(() => {
+    if (last.current === block) return
+    last.current = block
+    const parsed = textToDiagram(src)
+    const same = JSON.stringify({ d: parsed.direction, n: parsed.nodes, e: parsed.edges }) === JSON.stringify({ d: block.direction ?? 'right', n: block.nodes, e: block.edges })
+    if (!same) setSrc(diagramToText(block))
+  }, [block, src])
+  const change = (text: string): void => {
+    setSrc(text)
+    const { direction, nodes, edges, errors } = textToDiagram(text)
+    setErrors(errors)
+    up({ direction, nodes, edges })
+  }
+  const setDirection = (d: 'right' | 'down'): void =>
+    change([`direction: ${d}`, ...src.split('\n').filter((l) => !/^\s*direction\s*:/i.test(l))].join('\n'))
+  return (
+    <>
+      <div className="seg small">
+        {(['right', 'down'] as const).map((d) => (
+          <button key={d} className={(block.direction ?? 'right') === d ? 'on' : ''} onClick={() => setDirection(d)}>
+            {d === 'right' ? 'Left → right' : 'Top → bottom'}
+          </button>
+        ))}
+      </div>
+      <Area value={src} className="mono" rows={8} spellCheck={false} onChange={(e) => change(e.target.value)} />
+      {errors.length > 0 && <p className="hint err">{errors.slice(0, 3).join(' · ')}</p>}
+      <p className="hint">{DIAGRAM_HELP}</p>
+    </>
+  )
+}
 
 function GanttEditor({ block }: { block: BlockOf<'gantt'> }): React.JSX.Element {
   const up = useUpdate(block.id)

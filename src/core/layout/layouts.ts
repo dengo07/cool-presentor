@@ -14,6 +14,7 @@ import {
   renderText,
   renderTimeline
 } from './blocks'
+import { renderDiagram } from './diagram'
 import { all, type Box, card, contentBlocks, type Ctx, hasHeader, header, hline, MX, MY, one, pad2, rect, text, vline } from './ctx'
 import type { Zone } from './deco'
 
@@ -31,7 +32,7 @@ export interface Sig {
   maxItemLen: number
 }
 
-const TYPES: BlockType[] = ['title', 'subtitle', 'eyebrow', 'text', 'bullets', 'stat', 'quote', 'image', 'chart', 'timeline', 'features', 'comparison', 'gantt', 'funnel']
+const TYPES: BlockType[] = ['title', 'subtitle', 'eyebrow', 'text', 'bullets', 'stat', 'quote', 'image', 'chart', 'timeline', 'features', 'comparison', 'gantt', 'funnel', 'diagram']
 
 export function signature(slide: Slide, index: number, total: number): Sig {
   const n = Object.fromEntries(TYPES.map((t) => [t, 0])) as Record<BlockType, number>
@@ -138,6 +139,9 @@ export function renderAny(ctx: Ctx, b: Block, box: Box): void {
       break
     case 'funnel':
       renderFunnel(ctx, b, box)
+      break
+    case 'diagram':
+      renderDiagram(ctx, b, box)
       break
     default:
       break
@@ -393,6 +397,28 @@ export const LAYOUTS: Layout[] = [
       const bottom = header(ctx, { x: MX, y: MY, w: W - MX * 2 - 2, h: 1.8 })
       const top = Math.max(bottom + 0.4, 1.9)
       renderGantt(ctx, one(ctx, 'gantt')!, { x: MX, y: top, w: W - MX * 2, h: H - MY + 0.15 - top })
+    }
+  },
+  {
+    id: 'diagram',
+    name: 'Diagram',
+    zone: 'corner',
+    score: (s) => (s.n.diagram === 1 && only(s, 'diagram') ? 10 : 0),
+    render(ctx) {
+      const bottom = header(ctx, { x: MX, y: MY, w: W - MX * 2 - 2, h: 1.8 })
+      const top = Math.max(bottom + 0.35, 1.8)
+      renderDiagram(ctx, one(ctx, 'diagram')!, { x: MX, y: top, w: W - MX * 2, h: H - MY + 0.1 - top })
+    }
+  },
+  {
+    id: 'diagram-side',
+    name: 'Diagram + text',
+    zone: 'corner',
+    score: (s) => (s.n.diagram === 1 && only(s, 'diagram', 'text', 'bullets') ? (s.n.text || s.n.bullets ? 10 : 6) : 0),
+    render(ctx) {
+      // diagram on the left, header + takeaway on the right
+      renderDiagram(ctx, one(ctx, 'diagram')!, { x: MX - 0.2, y: MY, w: 8.1, h: H - MY * 2 })
+      headerAndBody(ctx, { x: MX + 8.4, y: MY, w: W - MX * 2 - 8.4, h: H - MY * 2 }, { titleMax: 32, max: 17 })
     }
   },
   {

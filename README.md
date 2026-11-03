@@ -16,6 +16,15 @@ Cool Presentor is a desktop app where you never push boxes around. You type what
    = 73% | of time spent formatting
    = 10× | faster with Cool Presentor
    ```
+   **Diagrams** are written as text in the block editor, one box or arrow per line:
+   ```
+   direction: down
+   pi: Raspberry Pi 5 | Vision · ROS 2 {group: Vehicle}
+   esp: ESP32 | PID · watchdog {group: Vehicle; style: dark}
+   pi <-> esp: UART
+   ```
+   `-->` is dashed, `=>` bold, `<->` two-way. Options: `group`, `style` (accent, dark, muted, alert), `shape` (pill, circle, diamond) and `at: col,row` to pin a box. Groups become bands across the flow; the rest is placed from the arrows.
+
    Wrap a word in `*asterisks*` to highlight it in the theme's accent colour (gradient text on some themes); `**double**` makes it bold.
 2. **Design happens automatically.** Each slide gets the best of about 22 layouts for its content. Neighbouring slides are varied. Click a layout chip or press **Shuffle** (`Ctrl+L`) to try others.
 3. **Theme** (`Ctrl+T`). Ten curated themes, each previewed on *your* slides. The **Customize** tab adjusts each deck separately:
@@ -33,6 +42,9 @@ Cool Presentor is a desktop app where you never push boxes around. You type what
      - Old PowerPoint files can be redesigned this way.
      - The document's facts and numbers are used, and sources are mentioned in the speaker notes.
      - With the API engine, PDFs are sent as PDFs, so Claude also sees charts and tables.
+   - **Assistant** (right panel, or the *Assistant* button) is a chat about *this* deck. Claude sees the whole deck, the slide you are on, the earlier conversation, facts it remembered and the files you attached, and answers with targeted edits: it changes the blocks that need it and keeps everything else. Ask for one slide ("make this more visual") or the whole deck ("use decimal commas everywhere", "check for inconsistencies"). Every answer lists what changed and is one undo step.
+     - **Per-deck memory.** The conversation, remembered facts and attached files are saved inside the `.cpres` file, so each deck has its own memory. Open *Memory* to review or forget them. Undo never removes chat history.
+     - Documents used by **Generate** are kept in the same memory.
    - The slide **AI** menu punches up, shortens or "makes visual" a slide.
    - The wand buttons rewrite a single block.
    - **Settings** writes speaker notes for every slide.
@@ -41,7 +53,7 @@ Cool Presentor is a desktop app where you never push boxes around. You type what
 
 - **Design system, not templates.** Themes define type scale, font pairing, palette, card style and decorations. Layouts only arrange content blocks.
 - **Morph everywhere.** Each slide carries persistent objects: the background, three decorative shapes (glows, orbs, blocks) and the title. They share `!!`-prefixed names, so PowerPoint Morph glides and recolours them between slides automatically.
-- **Native everything.** Text stays editable. Charts are native PowerPoint charts: column, bar, stacked column, stacked bar, line, area, pie, donut and radar. Pie and donut charts get a distinct on-theme colour for every slice, however many there are. **Gantt charts** (tasks, milestones, progress, colour-coded groups) and **funnels** are drawn as editable shapes. Icons are embedded as SVG with PNG fallbacks. Gradients are real `gradFill`s, and the fonts (all OFL licensed) are embedded in the file.
+- **Native everything.** Text stays editable. Charts are native PowerPoint charts: column, bar, stacked column, stacked bar, line, area, pie, donut and radar. Pie and donut charts get a distinct on-theme colour for every slice, however many there are. **Diagrams** (boxes, arrows, labelled groups: architectures, flows, state machines) are laid out automatically and drawn as editable shapes and connectors. **Gantt charts** (tasks, milestones, progress, colour-coded groups) and **funnels** are drawn as editable shapes. Icons are embedded as SVG with PNG fallbacks. Gradients are real `gradFill`s, and the fonts (all OFL licensed) are embedded in the file.
 - **WYSIWYG fitting.** One layout engine produces a *scene* (positioned primitives in inches). The same scene renders the in-app preview and the `.pptx`, and text is auto-fitted using canvas measurement of the same fonts.
 
 ## Development
@@ -75,6 +87,9 @@ src/core/            pure TypeScript, no DOM – shared by app, exporter and tes
                      morph transitions, gradients, rounded images, bullet colours, font embedding
   outline.ts         outline-mode text ⇄ slides
   ai-schema.ts       structured-output schema for Claude + conversion to blocks
+  assistant.ts       deck → model context, and applying the assistant's edit operations
+  diagram-text.ts    the text form of diagrams
+  layout/diagram.ts  diagram placement (layers, groups, ordering) and connector routing
 src/main/            Electron main: windows, menus, file dialogs, autosave, Claude calls
 src/preload/         typed IPC bridge (window.api)
 src/renderer/        React UI: slide strip, live stage, block inspector, outline, themes, present mode

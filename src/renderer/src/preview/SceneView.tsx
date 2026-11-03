@@ -57,24 +57,7 @@ const ElView = memo(function ElView({ el, onPick }: { el: El; onPick?: (id: stri
 
   switch (el.kind) {
     case 'shape': {
-      if (el.shape === 'line') {
-        const horiz = el.h === 0
-        const w = (el.line?.width ?? 1) * PT
-        return (
-          <div
-            className="el"
-            style={{
-              ...box(el),
-              height: horiz ? 0 : el.h * PX,
-              width: horiz ? el.w * PX : 0,
-              borderTop: horiz ? `${w}px solid ${rgba(el.line!.color, el.line!.alpha ?? 1)}` : undefined,
-              borderLeft: horiz ? undefined : `${w}px solid ${rgba(el.line!.color, el.line!.alpha ?? 1)}`,
-              marginTop: horiz ? -w / 2 : 0,
-              marginLeft: horiz ? 0 : -w / 2
-            }}
-          />
-        )
-      }
+      if (el.shape === 'line') return <LineView el={el} />
       const s = el.shadow
       return (
         <div
@@ -118,6 +101,47 @@ const ElView = memo(function ElView({ el, onPick }: { el: El; onPick?: (id: stri
       )
   }
 })
+
+/** A line segment (any direction, optional dash and arrowheads) drawn as SVG. */
+function LineView({ el }: { el: Extract<El, { kind: 'shape' }> }): React.JSX.Element {
+  const sw = (el.line?.width ?? 1) * PT
+  const color = rgba(el.line?.color ?? '000000', el.line?.alpha ?? 1)
+  const head = Math.max(7, sw * 3.2) // arrowhead length, px
+  const pad = head
+  const x0 = Math.min(el.x, el.x + el.w) * PX - pad
+  const y0 = Math.min(el.y, el.y + el.h) * PX - pad
+  const ax = el.x * PX - x0
+  const ay = el.y * PX - y0
+  const bx = (el.x + el.w) * PX - x0
+  const by = (el.y + el.h) * PX - y0
+  const len = Math.hypot(bx - ax, by - ay) || 1
+  const ux = (bx - ax) / len
+  const uy = (by - ay) / len
+  // arrowhead triangle with its tip at (tx, ty), pointing along (dx, dy)
+  const tri = (tx: number, ty: number, dx: number, dy: number): string => {
+    const w = head * 0.55
+    const bxp = tx - dx * head
+    const byp = ty - dy * head
+    return `${tx},${ty} ${bxp - dy * w},${byp + dx * w} ${bxp + dy * w},${byp - dx * w}`
+  }
+  const start = el.arrow?.start
+  const end = el.arrow?.end
+  // stop the stroke short of the tip so the line does not poke through the arrowhead
+  const sx = start ? ax + ux * head * 0.8 : ax
+  const sy = start ? ay + uy * head * 0.8 : ay
+  const ex = end ? bx - ux * head * 0.8 : bx
+  const ey = end ? by - uy * head * 0.8 : by
+  return (
+    <svg
+      className="el"
+      style={{ left: x0, top: y0, width: Math.abs(el.w) * PX + pad * 2, height: Math.abs(el.h) * PX + pad * 2, overflow: 'visible' }}
+    >
+      <line x1={sx} y1={sy} x2={ex} y2={ey} stroke={color} strokeWidth={sw} strokeDasharray={el.line?.dash ? `${sw * 3} ${sw * 2.2}` : undefined} />
+      {start && <polygon points={tri(ax, ay, -ux, -uy)} fill={color} />}
+      {end && <polygon points={tri(bx, by, ux, uy)} fill={color} />}
+    </svg>
+  )
+}
 
 function IconView({ el }: { el: Extract<El, { kind: 'icon' }> }): React.JSX.Element {
   const html = useMemo(() => iconSvg(el.icon, el.color, el.stroke, el.w * PX), [el.icon, el.color, el.stroke, el.w])

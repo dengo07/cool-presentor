@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { temporal } from 'zundo'
-import { type Block, type BlockType, type Deck, newBlock, newDeck, newSlide, type Slide, type ThemeCustom, uid } from '@core/model'
+import { type Assistant, type Block, type BlockType, type Deck, newBlock, newDeck, newSlide, type Slide, type ThemeCustom, uid } from '@core/model'
+import { emptyAssistant } from '@core/assistant'
 import { candidates, resolveLayouts } from '@core/layout/engine'
 
 export type View = 'edit' | 'outline'
@@ -12,8 +13,13 @@ interface State {
   dirty: boolean
   view: View
   focusBlock: string | null
+  /** the AI assistant's memory for this deck – saved in the file, but outside undo history */
+  assistant: Assistant
 
   load(deck: Deck, path?: string | null): void
+  setAssistant(fn: (a: Assistant) => Assistant): void
+  /** the deck plus its assistant memory, as stored in a .cpres file */
+  serialize(): string
   setDeck(deck: Deck): void
   setTitle(title: string): void
   setTheme(id: string): void
@@ -61,10 +67,18 @@ export const useStore = create<State>()(
         dirty: false,
         view: 'edit',
         focusBlock: null,
+        assistant: emptyAssistant(),
 
-        load: (deck, path = null) => {
-          set({ deck, current: 0, filePath: path, dirty: false, focusBlock: null })
+        load: (full, path = null) => {
+          const { assistant, ...deck } = full
+          set({ deck, assistant: assistant ?? emptyAssistant(), current: 0, filePath: path, dirty: false, focusBlock: null })
           useStore.temporal.getState().clear()
+        },
+        setAssistant: (fn) => set({ assistant: fn(get().assistant), dirty: true }),
+        serialize: () => {
+          const a = get().assistant
+          const empty = !a.history.length && !a.memory.length && !a.docs.length
+          return JSON.stringify(empty ? get().deck : { ...get().deck, assistant: a })
         },
         setDeck: (deck) => edit(deck, { current: Math.min(get().current, Math.max(0, deck.slides.length - 1)) }),
         setTitle: (title) => edit({ ...get().deck, title }),

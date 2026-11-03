@@ -5,7 +5,7 @@ import { basename, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describeSlide, aiDeckToSlides, aiSlideToBlocks } from '../core/ai-schema'
 import type { Deck, Slide } from '../core/model'
-import { friendlyError, generateDeck, improveSlide, type Provider, rewriteText, setApiKey, setEngine, speakerNotes } from './ai'
+import { assist, type AssistRequest, friendlyError, generateDeck, improveSlide, type Provider, rewriteText, setApiKey, setEngine, speakerNotes } from './ai'
 import { type ClaudeCodeInfo, detectClaudeCode } from './claude-code'
 import { addDocument, type AttachmentInfo, DOC_EXTENSIONS, getDocuments, removeDocument } from './documents'
 
@@ -290,6 +290,11 @@ function registerIpc(): void {
   })
   ipcMain.handle('docs:add', (_e, paths: string[]) => addAll(paths))
   ipcMain.handle('docs:remove', (_e, id: string) => removeDocument(id))
+  // the extracted text, so the renderer can keep it in the deck's assistant memory
+  ipcMain.handle('docs:read', (_e, id: string) => {
+    const d = getDocuments([id])[0]
+    return d ? { id: d.id, name: d.name, kind: d.kind, pages: d.pages, text: d.text } : null
+  })
 
   ipcMain.handle('ai:deck', (_e, prompt: string, count: number, docIds: string[] = []) =>
     wrap(async () => {
@@ -309,6 +314,7 @@ function registerIpc(): void {
       return speakerNotes(outline)
     })
   )
+  ipcMain.handle('ai:assist', (_e, req: AssistRequest) => wrap(() => assist(req)))
   ipcMain.handle('ai:rewrite', (_e, text: string, instruction: string) => wrap(() => rewriteText(text, instruction)))
 }
 

@@ -10,14 +10,14 @@ import { exportDeck } from './lib/export'
 import { TopBar } from './editor/TopBar'
 import { SlideStrip } from './editor/SlideStrip'
 import { Stage } from './editor/Stage'
-import { Inspector } from './editor/Inspector'
+import { RightPanel } from './editor/Inspector'
 import { OutlineEditor } from './editor/OutlineEditor'
 import { Modals } from './editor/Modals'
 import { PresentMode } from './editor/PresentMode'
 
 async function save(as = false): Promise<void> {
   const st = useStore.getState()
-  const path = await window.api.saveDeck(JSON.stringify(st.deck), as ? null : st.filePath, st.deck.title)
+  const path = await window.api.saveDeck(st.serialize(), as ? null : st.filePath, st.deck.title)
   if (path) {
     st.markSaved(path)
     useUi.getState().toast({ kind: 'success', text: 'Saved' }, 1800)
@@ -123,9 +123,9 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     let t: ReturnType<typeof setTimeout> | undefined
     return useStore.subscribe((s, prev) => {
-      if (s.deck !== prev.deck) {
+      if (s.deck !== prev.deck || s.assistant !== prev.assistant) {
         clearTimeout(t)
-        t = setTimeout(() => window.api.autosave(JSON.stringify(useStore.getState().deck)), 800)
+        t = setTimeout(() => window.api.autosave(useStore.getState().serialize()), 800)
       }
       if (s.dirty !== prev.dirty) window.api.setDirty(s.dirty)
       if (s.filePath !== prev.filePath || s.deck.title !== prev.deck.title) window.api.setTitle(s.filePath, s.deck.title)
@@ -167,7 +167,7 @@ export function App(): React.JSX.Element {
       <div className={'workspace mode-' + view}>
         {view === 'edit' ? <SlideStrip scenes={scenes} /> : <OutlineEditor />}
         <Stage scenes={scenes} />
-        {view === 'edit' && <Inspector />}
+        {view === 'edit' && <RightPanel />}
       </div>
       <Modals />
       {presenting !== null && scenes.length > 0 && <PresentMode scenes={scenes} start={presenting} />}

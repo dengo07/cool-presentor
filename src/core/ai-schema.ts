@@ -41,6 +41,33 @@ export const AiSlide = z.object({
     .array(z.object({ label: z.string(), value: z.number() }))
     .nullable()
     .describe('3-6 narrowing stages with numbers, e.g. visitors → sign-ups → customers'),
+  diagram: z
+    .object({
+      direction: z.enum(['right', 'down']),
+      nodes: z.array(
+        z.object({
+          id: z.string().describe('short identifier, e.g. "pi"'),
+          label: z.string(),
+          text: nstr.describe('optional one-line detail under the label'),
+          group: nstr.describe('nodes with the same group get a labelled container'),
+          style: z.enum(['default', 'accent', 'dark', 'muted', 'alert']).nullable().describe('alert = warnings/alarms; accent/dark = emphasis'),
+          shape: z.enum(['box', 'pill', 'circle', 'diamond']).nullable().describe('diamond = decision, pill/circle = start/end'),
+          col: z.number().int().nullable().describe('optional grid column (0-based) to pin the node'),
+          row: z.number().int().nullable().describe('optional grid row (0-based) to pin the node')
+        })
+      ),
+      edges: z.array(
+        z.object({
+          from: z.string(),
+          to: z.string(),
+          label: nstr,
+          style: z.enum(['solid', 'dashed', 'bold']).nullable(),
+          both: z.boolean().nullable().describe('arrowheads on both ends')
+        })
+      )
+    })
+    .nullable()
+    .describe('Boxes-and-arrows diagram drawn natively: system architecture, process flow, pipeline, state machine, org chart. 3-12 nodes.'),
   wantsImage: z.boolean().describe('True only if a photo would clearly make this slide stronger (the user adds it later). Use on at most 2-3 slides per deck.'),
   notes: z.string().describe('Speaker notes: 2-4 natural sentences')
 })
@@ -51,10 +78,39 @@ export const AiDeck = z.object({
 })
 
 export const AiNotes = z.object({ notes: z.array(z.string()) })
+
+/** One targeted change the assistant wants to make to the deck. */
+export const AiOp = z.object({
+  op: z
+    .enum(['edit_block', 'add_block', 'remove_block', 'replace_slide', 'insert_slide', 'delete_slide', 'move_slide', 'set_notes', 'set_layout', 'set_deck_title'])
+    .describe(
+      'edit_block: replace one block (keeps its id) · add_block: add a block to slideId (after blockId, or at the end) · remove_block · ' +
+        'replace_slide: rewrite slideId from `slide` (images are kept) · insert_slide: new slide from `slide` after afterSlideId (null = first) · ' +
+        'delete_slide · move_slide: put slideId after afterSlideId (null = first) · set_notes: speaker notes of slideId = text · ' +
+        'set_layout: layout of slideId = text ("auto" or a layout id) · set_deck_title: text'
+    ),
+  slideId: nstr,
+  blockId: nstr,
+  afterSlideId: nstr,
+  block: nstr.describe('edit_block / add_block: the complete block as a JSON object WITHOUT "id", same shape as in the deck JSON (e.g. {"type":"bullets","items":["…"]})'),
+  slide: AiSlide.nullable().describe('replace_slide / insert_slide'),
+  text: nstr
+})
+
+export const AiAssist = z.object({
+  reply: z.string().describe('Short answer to the user, in their language: what you did or your answer to their question'),
+  operations: z.array(AiOp).describe('Changes to apply, in order. Empty when the user only asked a question.'),
+  remember: z
+    .array(z.string())
+    .nullable()
+    .describe('New lasting facts about this deck or the user worth remembering in future conversations (preferences, decisions, names, dates). Null if none.')
+})
 export const AiText = z.object({ text: z.string() })
 
 export type AiSlide = z.infer<typeof AiSlide>
 export type AiDeck = z.infer<typeof AiDeck>
+export type AiOp = z.infer<typeof AiOp>
+export type AiAssist = z.infer<typeof AiAssist>
 
 export const SUGGESTED_ICONS = [
   'Zap', 'Shield', 'Sparkles', 'Rocket', 'Target', 'TrendingUp', 'Users', 'Heart', 'Globe', 'Lock', 'Clock', 'Cloud',
@@ -93,6 +149,23 @@ export function aiSlideToBlocks(s: AiSlide, keep: Block[] = []): Block[] {
       }))
     })
   if (s.funnel?.length) out.push({ id: id(), type: 'funnel', stages: s.funnel.slice(0, 7) })
+  if (s.diagram?.nodes.length)
+    out.push({
+      id: id(),
+      type: 'diagram',
+      direction: s.diagram.direction,
+      nodes: s.diagram.nodes.slice(0, 16).map((n) => ({
+        id: n.id,
+        label: n.label,
+        text: n.text ?? undefined,
+        group: n.group ?? undefined,
+        style: n.style ?? undefined,
+        shape: n.shape ?? undefined,
+        col: n.col !== null && n.col >= 0 ? n.col : undefined,
+        row: n.row !== null && n.row >= 0 ? n.row : undefined
+      })),
+      edges: s.diagram.edges.map((e) => ({ from: e.from, to: e.to, label: e.label ?? undefined, style: e.style ?? undefined, both: e.both ?? undefined }))
+    })
   if (s.comparison) out.push({ id: id(), type: 'comparison', left: s.comparison.left, right: s.comparison.right })
   if (s.quote) out.push({ id: id(), type: 'quote', text: s.quote.text, author: s.quote.author ?? undefined })
   if (s.text) out.push({ id: id(), type: 'text', text: s.text })

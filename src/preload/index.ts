@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { Deck, Slide, Block } from '../core/model'
+import type { AssistantDoc, AssistantTurn, Deck, Slide, Block } from '../core/model'
+import type { AiAssist } from '../core/ai-schema'
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: string }
 
@@ -24,6 +25,16 @@ export interface EngineStatus {
   claudePath: string
 }
 
+export interface AssistRequest {
+  message: string
+  deck: string
+  current: number
+  currentId: string
+  history: AssistantTurn[]
+  memory: string[]
+  docs: Omit<AssistantDoc, 'id'>[]
+}
+
 const api = {
   openDeck: (): Promise<{ path: string; json: string } | null> => ipcRenderer.invoke('deck:open'),
   saveDeck: (json: string, path: string | null, title: string): Promise<string | null> =>
@@ -46,12 +57,14 @@ const api = {
       ipcRenderer.invoke('ai:slide', slide, instruction, deckTitle),
     notes: (deck: Deck): Promise<Result<string[]>> => ipcRenderer.invoke('ai:notes', deck),
     rewrite: (text: string, instruction: string): Promise<Result<string>> => ipcRenderer.invoke('ai:rewrite', text, instruction),
-    test: (): Promise<Result<string>> => ipcRenderer.invoke('ai:test')
+    test: (): Promise<Result<string>> => ipcRenderer.invoke('ai:test'),
+    assist: (req: AssistRequest): Promise<Result<AiAssist>> => ipcRenderer.invoke('ai:assist', req)
   },
   docs: {
     pick: (): Promise<DocResult[]> => ipcRenderer.invoke('docs:pick'),
     add: (paths: string[]): Promise<DocResult[]> => ipcRenderer.invoke('docs:add', paths),
     remove: (id: string): Promise<void> => ipcRenderer.invoke('docs:remove', id),
+    read: (id: string): Promise<AssistantDoc | null> => ipcRenderer.invoke('docs:read', id),
     /** Absolute path of a dropped File (needed since Electron 32). */
     pathFor: (file: File): string => webUtils.getPathForFile(file)
   },

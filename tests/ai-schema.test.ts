@@ -25,6 +25,7 @@ describe('AI schema', () => {
       comparison: null,
       gantt: null,
       funnel: null,
+    diagram: null,
       wantsImage: true,
       notes: 'Say hi'
     }

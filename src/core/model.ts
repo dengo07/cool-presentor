@@ -69,6 +69,35 @@ export const FunnelBlock = z.object({
   stages: z.array(z.object({ label: z.string(), value: z.number() })),
   unit: z.string().optional()
 })
+/**
+ * Boxes-and-arrows diagram (architecture, flow, state machine…). The app lays
+ * it out on a grid; `row`/`col` pin a node, otherwise it is placed by the
+ * arrows. Nodes sharing a `group` get a labelled container.
+ */
+export const DiagramNode = z.object({
+  id: z.string(),
+  label: z.string(),
+  text: z.string().optional(),
+  group: z.string().optional(),
+  style: z.enum(['default', 'accent', 'dark', 'muted', 'alert']).optional(),
+  shape: z.enum(['box', 'pill', 'circle', 'diamond']).optional(),
+  row: z.number().int().min(0).optional(),
+  col: z.number().int().min(0).optional()
+})
+export const DiagramEdge = z.object({
+  from: z.string(),
+  to: z.string(),
+  label: z.string().optional(),
+  style: z.enum(['solid', 'dashed', 'bold']).optional(),
+  both: z.boolean().optional() // arrowheads on both ends
+})
+export const DiagramBlock = z.object({
+  id,
+  type: z.literal('diagram'),
+  direction: z.enum(['right', 'down']).optional(),
+  nodes: z.array(DiagramNode),
+  edges: z.array(DiagramEdge)
+})
 export const ComparisonBlock = z.object({
   id,
   type: z.literal('comparison'),
@@ -90,7 +119,8 @@ export const Block = z.discriminatedUnion('type', [
   FeaturesBlock,
   ComparisonBlock,
   GanttBlock,
-  FunnelBlock
+  FunnelBlock,
+  DiagramBlock
 ])
 
 export const Transition = z.enum(['morph', 'fade', 'none'])
@@ -118,12 +148,37 @@ export const ThemeCustom = z.object({
   deco: z.enum(['aurora', 'orbs', 'grid', 'lines', 'blocks', 'none']).optional()
 })
 
+/**
+ * The AI assistant's memory for one deck: the conversation, durable facts it
+ * chose to remember and the source documents the user attached. Stored inside
+ * the .cpres file, so every deck has its own memory.
+ */
+export const AssistantTurn = z.object({
+  role: z.enum(['user', 'assistant']),
+  text: z.string(),
+  at: z.string(), // ISO time
+  changes: z.array(z.string()).optional() // what the assistant changed in the deck
+})
+export const AssistantDoc = z.object({
+  id: z.string(),
+  name: z.string(),
+  kind: z.enum(['pdf', 'docx', 'pptx', 'text']),
+  pages: z.number().optional(),
+  text: z.string()
+})
+export const Assistant = z.object({
+  history: z.array(AssistantTurn).default([]),
+  memory: z.array(z.string()).default([]),
+  docs: z.array(AssistantDoc).default([])
+})
+
 export const Deck = z.object({
   version: z.literal(1),
   title: z.string(),
   themeId: z.string(),
   custom: ThemeCustom.optional(),
-  slides: z.array(Slide)
+  slides: z.array(Slide),
+  assistant: Assistant.optional()
 })
 
 export type Block = z.infer<typeof Block>
@@ -133,6 +188,11 @@ export type Deck = z.infer<typeof Deck>
 export type ChartKind = z.infer<typeof ChartKind>
 export type Transition = z.infer<typeof Transition>
 export type ThemeCustom = z.infer<typeof ThemeCustom>
+export type Assistant = z.infer<typeof Assistant>
+export type AssistantTurn = z.infer<typeof AssistantTurn>
+export type AssistantDoc = z.infer<typeof AssistantDoc>
+export type DiagramNode = z.infer<typeof DiagramNode>
+export type DiagramEdge = z.infer<typeof DiagramEdge>
 export type BlockOf<T extends BlockType> = Extract<Block, { type: T }>
 
 // ---------------------------------------------------------------------------
@@ -159,7 +219,8 @@ export const BLOCK_LABELS: Record<BlockType, string> = {
   features: 'Feature grid',
   comparison: 'Comparison',
   gantt: 'Gantt chart',
-  funnel: 'Funnel'
+  funnel: 'Funnel',
+  diagram: 'Diagram'
 }
 
 export function newBlock(type: BlockType): Block {
@@ -210,6 +271,22 @@ export function newBlock(type: BlockType): Block {
           { label: 'Sign-ups', value: 3400 },
           { label: 'Trials', value: 1100 },
           { label: 'Customers', value: 380 }
+        ]
+      }
+    case 'diagram':
+      return {
+        id: bid,
+        type,
+        direction: 'right',
+        nodes: [
+          { id: 'idea', label: 'Idea', text: 'What we want to build' },
+          { id: 'build', label: 'Build', text: 'Ship the first version', style: 'accent' },
+          { id: 'learn', label: 'Learn', text: 'Measure what users do' }
+        ],
+        edges: [
+          { from: 'idea', to: 'build' },
+          { from: 'build', to: 'learn' },
+          { from: 'learn', to: 'idea', label: 'iterate', style: 'dashed' }
         ]
       }
     case 'timeline':

@@ -1,4 +1,4 @@
-import { Download, ListTree, Palette, Play, Settings, Sparkles, Undo2, Redo2, LayoutGrid } from 'lucide-react'
+import { Download, ListTree, MessageSquare, Palette, Play, Settings, Sparkles, Undo2, Redo2, LayoutGrid } from 'lucide-react'
 import { useStore } from '../store'
 import { useUi } from '../ui'
 import { exportDeck } from '../lib/export'
@@ -40,6 +40,16 @@ export function TopBar(): React.JSX.Element {
       </button>
       <button className="btn ai" onClick={() => ui.open('ai')}>
         <Sparkles size={16} /> Generate
+      </button>
+      <button
+        className={'btn' + (view === 'edit' && ui.panel === 'assistant' ? ' on' : '')}
+        title="Chat with Claude about this deck"
+        onClick={() => {
+          setView('edit')
+          ui.setPanel(ui.panel === 'assistant' && view === 'edit' ? 'edit' : 'assistant')
+        }}
+      >
+        <MessageSquare size={16} /> Assistant
       </button>
       <button className="btn" onClick={() => ui.present(useStore.getState().current)} title="Present (F5)">
         <Play size={16} /> Present

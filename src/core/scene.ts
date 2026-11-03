@@ -62,9 +62,12 @@ export interface TextEl extends ElBase {
 
 export interface ShapeEl extends ElBase {
   kind: 'shape'
+  /** 'line' runs from (x, y) to (x + w, y + h); w/h may be negative to give it a direction. */
   shape: 'rect' | 'roundRect' | 'ellipse' | 'diamond' | 'line'
   fill?: Fill
   line?: { color: Color; width: number; alpha?: number; dash?: boolean } // width in pt
+  /** arrowheads on a 'line' */
+  arrow?: { start?: boolean; end?: boolean }
   radius?: number // inches (roundRect)
   shadow?: { color: Color; alpha: number; blur: number; offset: number; angle: number } // blur/offset in pt
 }
