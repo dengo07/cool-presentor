@@ -6,6 +6,8 @@ import {
   renderChart,
   renderComparison,
   renderFeatures,
+  renderFunnel,
+  renderGantt,
   renderImage,
   renderQuote,
   renderStat,
@@ -29,7 +31,7 @@ export interface Sig {
   maxItemLen: number
 }
 
-const TYPES: BlockType[] = ['title', 'subtitle', 'eyebrow', 'text', 'bullets', 'stat', 'quote', 'image', 'chart', 'timeline', 'features', 'comparison']
+const TYPES: BlockType[] = ['title', 'subtitle', 'eyebrow', 'text', 'bullets', 'stat', 'quote', 'image', 'chart', 'timeline', 'features', 'comparison', 'gantt', 'funnel']
 
 export function signature(slide: Slide, index: number, total: number): Sig {
   const n = Object.fromEntries(TYPES.map((t) => [t, 0])) as Record<BlockType, number>
@@ -130,6 +132,12 @@ export function renderAny(ctx: Ctx, b: Block, box: Box): void {
       break
     case 'comparison':
       renderComparison(ctx, b, box)
+      break
+    case 'gantt':
+      renderGantt(ctx, b, box)
+      break
+    case 'funnel':
+      renderFunnel(ctx, b, box)
       break
     default:
       break
@@ -374,6 +382,35 @@ export const LAYOUTS: Layout[] = [
       const bottom = header(ctx, { x: MX, y: MY, w: W - MX * 2 - 2, h: 1.9 })
       const top = Math.max(bottom + 0.4, 1.9)
       renderChart(ctx, one(ctx, 'chart')!, { x: MX - 0.1, y: top, w: W - MX * 2 + 0.2, h: H - MY - top })
+    }
+  },
+  {
+    id: 'gantt',
+    name: 'Gantt chart',
+    zone: 'corner',
+    score: (s) => (s.n.gantt === 1 && only(s, 'gantt') ? 10 : 0),
+    render(ctx) {
+      const bottom = header(ctx, { x: MX, y: MY, w: W - MX * 2 - 2, h: 1.8 })
+      const top = Math.max(bottom + 0.4, 1.9)
+      renderGantt(ctx, one(ctx, 'gantt')!, { x: MX, y: top, w: W - MX * 2, h: H - MY + 0.15 - top })
+    }
+  },
+  {
+    id: 'funnel',
+    name: 'Funnel',
+    zone: 'corner',
+    score: (s) => (s.n.funnel === 1 && only(s, 'funnel', 'text', 'bullets') ? 10 : 0),
+    render(ctx) {
+      const hasBody = ctx.slide.blocks.some((b) => b.type === 'text' || b.type === 'bullets')
+      if (hasBody) {
+        // funnel on the left, header + takeaway on the right
+        renderFunnel(ctx, one(ctx, 'funnel')!, { x: MX, y: MY + 0.1, w: 7.4, h: H - MY * 2 - 0.2 })
+        headerAndBody(ctx, { x: MX + 7.9, y: MY, w: W - MX * 2 - 7.9, h: H - MY * 2 }, { titleMax: 34, max: 18 })
+        return
+      }
+      const bottom = header(ctx, { x: MX, y: MY, w: W - MX * 2 - 2, h: 1.8 })
+      const top = Math.max(bottom + 0.45, 2)
+      renderFunnel(ctx, one(ctx, 'funnel')!, { x: MX, y: top, w: W - MX * 2, h: H - MY - top })
     }
   },
   {

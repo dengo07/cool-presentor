@@ -161,7 +161,14 @@ function addShape(pptx: PptxGenJS, slide: PptxGenJS.Slide, el: ShapeEl, objectNa
     slide.addShape(pptx.ShapeType.line, { x: el.x, y: el.y, w: el.w, h: el.h, line, objectName })
     return
   }
-  const type = el.shape === 'ellipse' ? pptx.ShapeType.ellipse : el.shape === 'roundRect' ? pptx.ShapeType.roundRect : pptx.ShapeType.rect
+  const type =
+    el.shape === 'ellipse'
+      ? pptx.ShapeType.ellipse
+      : el.shape === 'roundRect'
+        ? pptx.ShapeType.roundRect
+        : el.shape === 'diamond'
+          ? pptx.ShapeType.diamond
+          : pptx.ShapeType.rect
   const props: Props = {
     x: el.x,
     y: el.y,
@@ -247,9 +254,14 @@ function addImage(slide: PptxGenJS.Slide, el: ImageEl, objectName: string): void
 }
 
 function addChart(pptx: PptxGenJS, slide: PptxGenJS.Slide, el: ChartEl, objectName: string, bg: string): void {
-  const data = el.series.map((s) => ({ name: s.name, labels: el.categories, values: s.values }))
+  // PowerPoint lists horizontal-bar categories bottom-up; reverse so the first one is on top (like the preview)
+  const flip = el.chartKind === 'bar' || el.chartKind === 'stacked-bar'
+  const order = <T,>(xs: readonly T[]): T[] => (flip ? [...xs].reverse() : [...xs])
+  const data = el.series.map((s) => ({ name: s.name, labels: order(el.categories), values: order(s.values) }))
   const isPie = el.chartKind === 'pie' || el.chartKind === 'donut'
   const multi = el.series.length > 1
+  const stacked = el.chartKind === 'stacked-column' || el.chartKind === 'stacked-bar'
+  const horizontal = el.chartKind === 'bar' || el.chartKind === 'stacked-bar'
   const fmt = el.unit ? `0"${el.unit.replace(/"/g, '')}"` : 'General'
   const type =
     el.chartKind === 'line'
@@ -260,7 +272,9 @@ function addChart(pptx: PptxGenJS, slide: PptxGenJS.Slide, el: ChartEl, objectNa
           ? pptx.ChartType.pie
           : el.chartKind === 'donut'
             ? pptx.ChartType.doughnut
-            : pptx.ChartType.bar
+            : el.chartKind === 'radar'
+              ? pptx.ChartType.radar
+              : pptx.ChartType.bar
   const common: Props = {
     x: el.x,
     y: el.y,
@@ -269,7 +283,8 @@ function addChart(pptx: PptxGenJS, slide: PptxGenJS.Slide, el: ChartEl, objectNa
     objectName,
     chartColors: multi || isPie ? el.colors : [el.colors[0]],
     showLegend: multi || isPie,
-    legendPos: 'b',
+    // many slices: a legend on the right stays readable
+    legendPos: isPie && el.categories.length > 5 ? 'r' : 'b',
     legendColor: el.textColor,
     legendFontFace: el.font,
     legendFontSize: el.fontSize,
@@ -286,13 +301,15 @@ function addChart(pptx: PptxGenJS, slide: PptxGenJS.Slide, el: ChartEl, objectNa
       showValue: !!el.unit,
       showLabel: false,
       dataBorder: { pt: 2, color: bg },
-      dataLabelColor: 'FFFFFF',
+      dataLabelColor: el.labelColor ?? 'FFFFFF',
       firstSliceAng: 0
     })
   } else {
     Object.assign(common, {
-      barDir: el.chartKind === 'bar' ? 'bar' : 'col',
-      barGapWidthPct: 55,
+      barDir: horizontal ? 'bar' : 'col',
+      barGrouping: stacked ? 'stacked' : 'clustered',
+      barGapWidthPct: stacked ? 45 : 55,
+      radarStyle: 'marker',
       catAxisLabelColor: el.textColor,
       catAxisLabelFontFace: el.font,
       catAxisLabelFontSize: el.fontSize,
@@ -305,6 +322,7 @@ function addChart(pptx: PptxGenJS, slide: PptxGenJS.Slide, el: ChartEl, objectNa
       catAxisLineShow: false,
       valAxisLineShow: false,
       showValue: !multi && (el.chartKind === 'column' || el.chartKind === 'bar'),
+      overlap: stacked ? 100 : undefined,
       dataLabelPosition: 'outEnd',
       lineSize: 3,
       lineDataSymbol: 'circle',

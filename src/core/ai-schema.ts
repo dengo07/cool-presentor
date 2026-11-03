@@ -19,7 +19,7 @@ export const AiSlide = z.object({
   quote: z.object({ text: z.string(), author: nstr }).nullable(),
   chart: z
     .object({
-      kind: z.enum(['column', 'bar', 'line', 'area', 'pie', 'donut']),
+      kind: z.enum(['column', 'bar', 'stacked-column', 'stacked-bar', 'line', 'area', 'pie', 'donut', 'radar']),
       categories: z.array(z.string()),
       series: z.array(z.object({ name: z.string(), values: z.array(z.number()) })),
       unit: nstr
@@ -33,6 +33,14 @@ export const AiSlide = z.object({
       right: z.object({ title: z.string(), items: z.array(z.string()) })
     })
     .nullable(),
+  gantt: z
+    .array(z.object({ name: z.string(), start: z.string(), end: z.string(), group: nstr, progress: z.number().nullable() }))
+    .nullable()
+    .describe('Project schedule: tasks with ISO dates (YYYY-MM-DD); start = end for a milestone. Use for plans and roadmaps with real dates.'),
+  funnel: z
+    .array(z.object({ label: z.string(), value: z.number() }))
+    .nullable()
+    .describe('3-6 narrowing stages with numbers, e.g. visitors → sign-ups → customers'),
   wantsImage: z.boolean().describe('True only if a photo would clearly make this slide stronger (the user adds it later). Use on at most 2-3 slides per deck.'),
   notes: z.string().describe('Speaker notes: 2-4 natural sentences')
 })
@@ -72,6 +80,19 @@ export function aiSlideToBlocks(s: AiSlide, keep: Block[] = []): Block[] {
     out.push({ id: id(), type: 'timeline', items: s.timeline.slice(0, 6).map((t) => ({ date: t.date, title: t.title, text: t.text ?? undefined })) })
   if (s.features?.length)
     out.push({ id: id(), type: 'features', items: s.features.slice(0, 6).map((f) => ({ icon: icon(f.icon), title: f.title, text: f.text ?? undefined })) })
+  if (s.gantt?.length)
+    out.push({
+      id: id(),
+      type: 'gantt',
+      tasks: s.gantt.slice(0, 12).map((g) => ({
+        name: g.name,
+        start: g.start,
+        end: g.end,
+        group: g.group ?? undefined,
+        progress: g.progress === null ? undefined : Math.max(0, Math.min(100, g.progress))
+      }))
+    })
+  if (s.funnel?.length) out.push({ id: id(), type: 'funnel', stages: s.funnel.slice(0, 7) })
   if (s.comparison) out.push({ id: id(), type: 'comparison', left: s.comparison.left, right: s.comparison.right })
   if (s.quote) out.push({ id: id(), type: 'quote', text: s.quote.text, author: s.quote.author ?? undefined })
   if (s.text) out.push({ id: id(), type: 'text', text: s.text })

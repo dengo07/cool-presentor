@@ -17,7 +17,7 @@ Rules:
 - Titles: short and vivid (max ~8 words). Wrap exactly ONE key word or short phrase in *asterisks* to highlight it in the accent colour.
 - Use **double asterisks** sparingly for bold emphasis in body text.
 - Bullets: 2-6 items, each max ~8 words. Never write paragraphs in bullets.
-- Prefer visual structures over bullets whenever the content allows: stats (big numbers), charts, timelines, feature grids (with icons), comparisons, quotes.
+- Prefer visual structures over bullets whenever the content allows: stats (big numbers), charts (column, bar, stacked, line, area, pie, donut, radar), timelines, Gantt charts for dated plans, funnels for narrowing stages, feature grids (with icons), comparisons, quotes.
 - One idea per slide. Vary slide types across the deck so it never feels repetitive.
 - Start with a strong title slide (eyebrow + title + subtitle) and end with a memorable closing slide.
 - Section divider slides (eyebrow + title only) help longer decks breathe.

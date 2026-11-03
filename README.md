@@ -41,7 +41,7 @@ Cool Presentor is a desktop app where you never push boxes around. You type what
 
 - **Design system, not templates.** Themes define type scale, font pairing, palette, card style and decorations. Layouts only arrange content blocks.
 - **Morph everywhere.** Each slide carries persistent objects: the background, three decorative shapes (glows, orbs, blocks) and the title. They share `!!`-prefixed names, so PowerPoint Morph glides and recolours them between slides automatically.
-- **Native everything.** Text stays editable. Charts are native PowerPoint charts. Icons are embedded as SVG with PNG fallbacks. Gradients are real `gradFill`s, and the fonts (all OFL licensed) are embedded in the file.
+- **Native everything.** Text stays editable. Charts are native PowerPoint charts: column, bar, stacked column, stacked bar, line, area, pie, donut and radar. Pie and donut charts get a distinct on-theme colour for every slice, however many there are. **Gantt charts** (tasks, milestones, progress, colour-coded groups) and **funnels** are drawn as editable shapes. Icons are embedded as SVG with PNG fallbacks. Gradients are real `gradFill`s, and the fonts (all OFL licensed) are embedded in the file.
 - **WYSIWYG fitting.** One layout engine produces a *scene* (positioned primitives in inches). The same scene renders the in-app preview and the `.pptx`, and text is auto-fitted using canvas measurement of the same fonts.
 
 ## Development

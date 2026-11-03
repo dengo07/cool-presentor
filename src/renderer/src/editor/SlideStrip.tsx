@@ -13,6 +13,8 @@ const TEMPLATES: { label: string; blocks: BlockType[] }[] = [
   { label: 'Image + text', blocks: ['title', 'text', 'image'] },
   { label: 'Features', blocks: ['title', 'features'] },
   { label: 'Timeline', blocks: ['title', 'timeline'] },
+  { label: 'Gantt chart', blocks: ['title', 'gantt'] },
+  { label: 'Funnel', blocks: ['title', 'funnel'] },
   { label: 'Comparison', blocks: ['title', 'comparison'] },
   { label: 'Quote', blocks: ['quote'] },
   { label: 'Statement', blocks: ['text'] }

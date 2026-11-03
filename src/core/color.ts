@@ -56,3 +56,56 @@ export function ensureContrast(c: Color, bg: Color, min = 3): Color {
   for (let t = 0.05; contrast(out, bg) < min && t <= 0.9; t += 0.05) out = mix(c, toward, t)
   return out
 }
+
+/**
+ * Returns `n` distinct colours that stay on-theme: the base palette first,
+ * then darker and lighter variations of it, alternating so neighbouring
+ * pie slices never look alike. Every colour stays visible on `bg`.
+ */
+export function extendPalette(base: Color[], n: number, bg: Color): Color[] {
+  const out = base.filter((c) => contrast(c, bg) >= 1.25).slice(0, n)
+  if (out.length >= n) return out
+  const src = out.length ? [...out] : ['808080']
+  const steps: [Color, number][] = [
+    ['000000', 0.3],
+    ['FFFFFF', 0.38],
+    ['000000', 0.5],
+    ['FFFFFF', 0.58],
+    ['000000', 0.65],
+    ['FFFFFF', 0.72]
+  ]
+  const distance = (a: Color, b: Color): number => {
+    const [x, y] = [toRgb(a), toRgb(b)]
+    return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2])
+  }
+  for (const [toward, t] of steps) {
+    for (const c of src) {
+      if (out.length >= n) return out
+      const v = mix(c, toward, t)
+      if (contrast(v, bg) < 1.25 || out.some((o) => distance(o, v) < 28)) continue
+      out.push(v)
+    }
+  }
+  // Very large charts: fall back to evenly spread greys so we never repeat.
+  for (let i = 0; out.length < n; i++) out.push(mix('2A2A2A', 'D5D5D5', ((i * 7) % 11) / 10))
+  return out
+}
+
+/**
+ * Nudges colours that ended up (nearly) identical apart, moving them in the
+ * direction that keeps them readable under `label` text.
+ */
+export function separateColors(colors: Color[], label: Color): Color[] {
+  const toward = isDark(label) ? 'FFFFFF' : '000000'
+  const dist = (a: Color, b: Color): number => {
+    const [x, y] = [toRgb(a), toRgb(b)]
+    return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2])
+  }
+  const out: Color[] = []
+  for (const c of colors) {
+    let v = c
+    for (let k = 1; k <= 10 && out.some((o) => dist(o, v) < 24); k++) v = mix(c, toward, 0.08 * k)
+    out.push(v)
+  }
+  return out
+}

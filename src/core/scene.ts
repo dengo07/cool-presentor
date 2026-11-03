@@ -62,7 +62,7 @@ export interface TextEl extends ElBase {
 
 export interface ShapeEl extends ElBase {
   kind: 'shape'
-  shape: 'rect' | 'roundRect' | 'ellipse' | 'line'
+  shape: 'rect' | 'roundRect' | 'ellipse' | 'diamond' | 'line'
   fill?: Fill
   line?: { color: Color; width: number; alpha?: number; dash?: boolean } // width in pt
   radius?: number // inches (roundRect)
@@ -94,6 +94,8 @@ export interface ChartEl extends ElBase {
   series: { name: string; values: number[] }[]
   unit?: string
   colors: Color[]
+  /** pie/donut: colour of the labels drawn on the slices */
+  labelColor?: Color
   font: string
   textColor: Color
   gridColor: Color

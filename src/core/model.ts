@@ -29,7 +29,7 @@ export const ImageBlock = z.object({
   focusX: z.number().optional(), // 0..1 crop focus
   focusY: z.number().optional()
 })
-export const ChartKind = z.enum(['column', 'bar', 'line', 'area', 'pie', 'donut'])
+export const ChartKind = z.enum(['column', 'bar', 'stacked-column', 'stacked-bar', 'line', 'area', 'pie', 'donut', 'radar'])
 export const ChartBlock = z.object({
   id,
   type: z.literal('chart'),
@@ -47,6 +47,27 @@ export const FeaturesBlock = z.object({
   id,
   type: z.literal('features'),
   items: z.array(z.object({ icon: z.string(), title: z.string(), text: z.string().optional() }))
+})
+/** Project schedule. Dates are ISO (YYYY-MM-DD); start === end is a milestone. */
+export const GanttBlock = z.object({
+  id,
+  type: z.literal('gantt'),
+  tasks: z.array(
+    z.object({
+      name: z.string(),
+      start: z.string(),
+      end: z.string(),
+      group: z.string().optional(), // colour-coded workstream
+      progress: z.number().min(0).max(100).optional()
+    })
+  )
+})
+/** Stages that narrow down, e.g. a sales or hiring funnel. */
+export const FunnelBlock = z.object({
+  id,
+  type: z.literal('funnel'),
+  stages: z.array(z.object({ label: z.string(), value: z.number() })),
+  unit: z.string().optional()
 })
 export const ComparisonBlock = z.object({
   id,
@@ -67,7 +88,9 @@ export const Block = z.discriminatedUnion('type', [
   ChartBlock,
   TimelineBlock,
   FeaturesBlock,
-  ComparisonBlock
+  ComparisonBlock,
+  GanttBlock,
+  FunnelBlock
 ])
 
 export const Transition = z.enum(['morph', 'fade', 'none'])
@@ -134,7 +157,9 @@ export const BLOCK_LABELS: Record<BlockType, string> = {
   chart: 'Chart',
   timeline: 'Timeline',
   features: 'Feature grid',
-  comparison: 'Comparison'
+  comparison: 'Comparison',
+  gantt: 'Gantt chart',
+  funnel: 'Funnel'
 }
 
 export function newBlock(type: BlockType): Block {
@@ -163,6 +188,29 @@ export function newBlock(type: BlockType): Block {
         kind: 'column',
         categories: ['Q1', 'Q2', 'Q3', 'Q4'],
         series: [{ name: 'Revenue', values: [12, 19, 27, 41] }]
+      }
+    case 'gantt':
+      return {
+        id: bid,
+        type,
+        tasks: [
+          { name: 'Research', start: '2026-01-05', end: '2026-02-13', group: 'Discovery', progress: 100 },
+          { name: 'Design', start: '2026-02-02', end: '2026-03-20', group: 'Build', progress: 60 },
+          { name: 'Development', start: '2026-03-02', end: '2026-05-15', group: 'Build', progress: 20 },
+          { name: 'Testing', start: '2026-05-04', end: '2026-06-05', group: 'Launch' },
+          { name: 'Launch', start: '2026-06-08', end: '2026-06-08', group: 'Launch' }
+        ]
+      }
+    case 'funnel':
+      return {
+        id: bid,
+        type,
+        stages: [
+          { label: 'Visitors', value: 12000 },
+          { label: 'Sign-ups', value: 3400 },
+          { label: 'Trials', value: 1100 },
+          { label: 'Customers', value: 380 }
+        ]
       }
     case 'timeline':
       return {

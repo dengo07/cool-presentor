@@ -1,6 +1,7 @@
 import type { BlockOf } from '../model'
 import type { Para } from '../scene'
 import { fitSize } from '../measure'
+import { contrast, ensureContrast, extendPalette, mix, readableOn, separateColors } from '../color'
 import { add, card, type Box, type Ctx, hline, pad2, parseInline, rect, roleSpec, text, vline } from './ctx'
 
 // ---------------------------------------------------------------------------
@@ -111,6 +112,19 @@ export function renderImage(ctx: Ctx, b: BlockOf<'image'>, box: Box, o: { radius
 
 export function renderChart(ctx: Ctx, b: BlockOf<'chart'>, box: Box): void {
   const t = ctx.theme
+  // one colour per slice (pie/donut) or per series – never repeat
+  const perPoint = b.kind === 'pie' || b.kind === 'donut'
+  const needed = perPoint ? b.categories.length : b.series.length
+  let colors = extendPalette(t.chartColors, Math.max(1, needed), t.bgColor)
+  let labelColor: string | undefined
+  if (perPoint) {
+    // One label colour for all slices (PowerPoint limitation): pick the one that
+    // reads on most slices, then adjust the few slices where it doesn't.
+    const white = colors.filter((c) => contrast(c, 'FFFFFF') >= 3).length
+    const dark = colors.filter((c) => contrast(c, '1A1A1A') >= 3).length
+    labelColor = white >= dark ? 'FFFFFF' : '1A1A1A'
+    colors = separateColors(colors.map((c) => ensureContrast(c, labelColor!, 3)), labelColor)
+  }
   add(ctx, {
     kind: 'chart',
     id: b.id,
@@ -119,7 +133,8 @@ export function renderChart(ctx: Ctx, b: BlockOf<'chart'>, box: Box): void {
     categories: b.categories,
     series: b.series,
     unit: b.unit,
-    colors: t.chartColors,
+    colors,
+    labelColor,
     font: t.body.font,
     textColor: t.muted,
     gridColor: t.dark ? '3A3F55' : 'DDDDDD',
@@ -349,5 +364,201 @@ export function renderBulletCards(ctx: Ctx, b: BlockOf<'bullets'>, box: Box): vo
     text(ctx, { id: `${b.id}-n${i}`, role: 'label', text: pad2(i + 1), x: x + pad, y: y + pad, w: 1, h: 0.32, maxLines: 1 })
     vline(ctx, `${b.id}-tick${i}`, x, y + pad, 0.3, t.accents[i % 3], 3)
     text(ctx, { id: `${b.id}-t${i}`, role: 'cardTitle', text: it, x: x + pad, y: y + pad + 0.45, w: cw - pad * 2, h: ch - pad * 2 - 0.45, max: size, valign: 'bottom' })
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Gantt chart – drawn with native shapes so it stays editable in PowerPoint.
+// ---------------------------------------------------------------------------
+
+const DAY = 86_400_000
+
+/** Label colour for big/bold text on a coloured shape – white unless it really doesn't read. */
+function labelOn(fill: string): string {
+  return contrast(fill, 'FFFFFF') >= 3 ? 'FFFFFF' : '1A1A1A'
+}
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+function parseDay(s: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s.trim())
+  if (!m) return null
+  const t = Date.UTC(+m[1], +m[2] - 1, +m[3])
+  return Number.isNaN(t) ? null : t
+}
+
+/** Axis ticks with a step chosen so there are at most ~12 labels. */
+export function ganttTicks(min: number, max: number): { at: number; label: string }[] {
+  const days = (max - min) / DAY
+  const out: { at: number; label: string }[] = []
+  const d0 = new Date(min)
+  if (days <= 75) {
+    // weekly (or daily for very short plans), starting on a Monday
+    const step = days <= 14 ? 1 : days <= 28 ? 2 : 7
+    let t = step === 7 ? min - ((d0.getUTCDay() + 6) % 7) * DAY : min
+    for (; t <= max; t += step * DAY) {
+      const at = Math.max(t, min)
+      const d = new Date(at)
+      out.push({ at, label: `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}` })
+    }
+    return out
+  }
+  const months = days / 30.4
+  const step = months <= 12 ? 1 : months <= 24 ? 2 : months <= 36 ? 3 : months <= 72 ? 6 : 12
+  const y = d0.getUTCFullYear()
+  let m = Math.floor(d0.getUTCMonth() / step) * step
+  for (;;) {
+    const t = Date.UTC(y + Math.floor(m / 12), m % 12, 1)
+    if (t > max) break
+    // the first tick sits at the start of the axis, labelled with its month
+    const d = new Date(t)
+    const label = step >= 12 ? String(d.getUTCFullYear()) : d.getUTCMonth() === 0 || out.length === 0 ? `${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}` : MONTHS[d.getUTCMonth()]
+    out.push({ at: Math.max(t, min), label })
+    m += step
+  }
+  return out
+}
+
+export function renderGantt(ctx: Ctx, b: BlockOf<'gantt'>, box: Box): void {
+  const t = ctx.theme
+  const tasks = b.tasks
+    .map((k) => ({ ...k, s: parseDay(k.start), e: parseDay(k.end) }))
+    .filter((k): k is typeof k & { s: number; e: number } => k.s !== null && k.e !== null)
+    .map((k) => ({ ...k, e: Math.max(k.s, k.e) }))
+  if (!tasks.length) {
+    text(ctx, { id: `${b.id}-empty`, role: 'small', text: 'Add tasks with dates (YYYY-MM-DD) to draw the schedule.', ...box })
+    return
+  }
+  const min = Math.min(...tasks.map((k) => k.s))
+  const max = Math.max(...tasks.map((k) => k.e)) + DAY // end dates are inclusive
+  const span = Math.max(DAY, max - min)
+
+  const groups = [...new Set(tasks.map((k) => k.group).filter((g): g is string => !!g))]
+  const colors = extendPalette(t.accents, Math.max(1, groups.length || 1), t.bgColor)
+  const colorOf = (g?: string): string => colors[Math.max(0, groups.indexOf(g ?? ''))] ?? t.accents[0]
+
+  const legendH = groups.length > 1 ? 0.45 : 0
+  const headerH = 0.42
+  const labelW = Math.min(3.1, box.w * 0.27)
+  const x0 = box.x + labelW + 0.25
+  const x1 = box.x + box.w
+  const rowH = Math.min(0.62, (box.h - headerH - legendH) / tasks.length)
+  const y0 = box.y + headerH
+  const X = (ms: number): number => x0 + ((ms - min) / span) * (x1 - x0)
+  const rowsBottom = y0 + rowH * tasks.length
+
+  // zebra rows
+  tasks.forEach((_, i) => {
+    if (i % 2 === 0) rect(ctx, `${b.id}-row${i}`, { x: box.x, y: y0 + i * rowH, w: box.w, h: rowH }, { kind: 'solid', color: t.text, alpha: t.dark ? 0.05 : 0.035 })
+  })
+  // time axis
+  const ticks = ganttTicks(min, max)
+  ticks.forEach((tk, i) => {
+    const x = X(tk.at)
+    vline(ctx, `${b.id}-grid${i}`, x, y0 - 0.06, rowsBottom - y0 + 0.06, t.muted, 0.75, 0.35)
+    const next = i < ticks.length - 1 ? X(ticks[i + 1].at) : x1
+    if (next - x > 0.35) text(ctx, { id: `${b.id}-tick${i}`, role: 'label', text: tk.label, x: x + 0.06, y: box.y, w: next - x - 0.08, h: 0.3, color: t.muted, maxLines: 1, max: 11, min: 8 })
+  })
+  // tasks
+  tasks.forEach((k, i) => {
+    const cy = y0 + i * rowH + rowH / 2
+    text(ctx, { id: `${b.id}-name${i}`, role: 'body', text: k.name, x: box.x + 0.12, y: y0 + i * rowH, w: labelW - 0.12, h: rowH, valign: 'middle', max: 15, min: 9, maxLines: 1 })
+    const c = colorOf(k.group)
+    if (k.s === k.e) {
+      // milestone
+      const d = Math.min(rowH * 0.55, 0.32)
+      add(ctx, { kind: 'shape', id: `${b.id}-bar${i}`, shape: 'diamond', x: X(k.s + DAY / 2) - d / 2, y: cy - d / 2, w: d, h: d, fill: { kind: 'solid', color: c } })
+      return
+    }
+    const bx = X(k.s)
+    const bw = Math.max(0.08, X(k.e + DAY) - bx)
+    const bh = rowH * 0.56
+    const r = Math.min(bh / 2, 0.08)
+    const p = k.progress
+    if (p !== undefined && p < 100) {
+      add(ctx, { kind: 'shape', id: `${b.id}-bar${i}`, shape: 'roundRect', radius: r, x: bx, y: cy - bh / 2, w: bw, h: bh, fill: { kind: 'solid', color: mix(c, t.bgColor, 0.62) } })
+      if (p > 0)
+        add(ctx, { kind: 'shape', id: `${b.id}-done${i}`, shape: 'roundRect', radius: r, x: bx, y: cy - bh / 2, w: Math.max(r * 2, (bw * p) / 100), h: bh, fill: { kind: 'solid', color: c } })
+    } else {
+      add(ctx, { kind: 'shape', id: `${b.id}-bar${i}`, shape: 'roundRect', radius: r, x: bx, y: cy - bh / 2, w: bw, h: bh, fill: { kind: 'solid', color: c } })
+    }
+    if (p !== undefined) {
+      const label = p >= 100 ? '✓' : `${Math.round(p)}%`
+      const inside = bw > 0.75
+      const lx = inside ? bx + 0.08 : bx + bw + 0.06
+      if (inside || x1 - lx > 0.45)
+        text(ctx, {
+          id: `${b.id}-pct${i}`,
+          role: 'small',
+          text: label,
+          x: lx,
+          y: cy - bh / 2,
+          w: inside ? bw - 0.12 : 0.6,
+          h: bh,
+          valign: 'middle',
+          color: inside ? (p >= 100 ? labelOn(c) : readableOn(mix(c, t.bgColor, 0.62))) : t.muted,
+          max: 11,
+          min: 8,
+          maxLines: 1
+        })
+    }
+  })
+  // legend for colour-coded workstreams
+  if (groups.length > 1) {
+    let lx = x0
+    groups.forEach((g, i) => {
+      const w = Math.min(2.6, 0.45 + g.length * 0.085)
+      rect(ctx, `${b.id}-lg${i}`, { x: lx, y: rowsBottom + 0.2, w: 0.16, h: 0.16 }, { kind: 'solid', color: colors[i] }, 0.03)
+      text(ctx, { id: `${b.id}-lgt${i}`, role: 'small', text: g, x: lx + 0.24, y: rowsBottom + 0.13, w: w - 0.24, h: 0.3, max: 12, maxLines: 1, color: t.muted })
+      lx += w + 0.2
+    })
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Funnel – stages that narrow down, with conversion between steps.
+// ---------------------------------------------------------------------------
+
+function fmtNum(v: number): string {
+  if (Math.abs(v) >= 1e6) return `${Math.round(v / 1e5) / 10}M`
+  if (Math.abs(v) >= 1e4) return `${Math.round(v / 100) / 10}k`
+  return v.toLocaleString('en-US')
+}
+
+export function renderFunnel(ctx: Ctx, b: BlockOf<'funnel'>, box: Box): void {
+  const t = ctx.theme
+  const stages = b.stages.filter((s) => Number.isFinite(s.value))
+  if (!stages.length) return
+  const max = Math.max(...stages.map((s) => Math.abs(s.value)), 1)
+  const gap = 0.1
+  const rowH = Math.min(1.05, (box.h - gap * (stages.length - 1)) / stages.length)
+  const barArea = box.w * 0.6
+  const top = box.y + (box.h - (rowH * stages.length + gap * (stages.length - 1))) / 2
+  stages.forEach((s, i) => {
+    const y = top + i * (rowH + gap)
+    const w = barArea * (0.28 + (0.72 * Math.abs(s.value)) / max)
+    const x = box.x + (barArea - w) / 2
+    const c = mix(t.accents[0], t.bgColor, (i / Math.max(1, stages.length)) * 0.55)
+    add(ctx, { kind: 'shape', id: `${b.id}-bar${i}`, shape: t.radius > 0 ? 'roundRect' : 'rect', radius: Math.min(t.radius, rowH / 2), x, y, w, h: rowH, fill: { kind: 'solid', color: c } })
+    text(ctx, {
+      id: `${b.id}-v${i}`,
+      role: 'cardTitle',
+      text: fmtNum(s.value) + (b.unit ?? ''),
+      x,
+      y,
+      w,
+      h: rowH,
+      align: 'center',
+      valign: 'middle',
+      color: labelOn(c),
+      bold: true,
+      max: 24,
+      min: 10,
+      maxLines: 1
+    })
+    const lx = box.x + barArea + 0.45
+    const conv = i > 0 && stages[i - 1].value ? Math.round((s.value / stages[i - 1].value) * 1000) / 10 : null
+    text(ctx, { id: `${b.id}-l${i}`, role: 'cardTitle', text: s.label, x: lx, y: y + (conv !== null ? 0.02 : 0), w: box.x + box.w - lx, h: conv !== null ? rowH * 0.58 : rowH, valign: conv !== null ? 'bottom' : 'middle', max: 22, maxLines: 1 })
+    if (conv !== null)
+      text(ctx, { id: `${b.id}-c${i}`, role: 'small', text: `${conv}% of previous step`, x: lx, y: y + rowH * 0.6, w: box.x + box.w - lx, h: rowH * 0.4, maxLines: 1, max: 13 })
   })
 }

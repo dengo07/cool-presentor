@@ -6,7 +6,7 @@ import { useStore } from '../store'
 import { useUi } from '../ui'
 import { fileToImage } from '../lib/images'
 
-const ADDABLE: BlockType[] = ['eyebrow', 'title', 'subtitle', 'text', 'bullets', 'stat', 'image', 'chart', 'quote', 'features', 'timeline', 'comparison']
+const ADDABLE: BlockType[] = ['eyebrow', 'title', 'subtitle', 'text', 'bullets', 'stat', 'image', 'chart', 'gantt', 'funnel', 'quote', 'features', 'timeline', 'comparison']
 
 export function Inspector(): React.JSX.Element {
   const slide = useStore((s) => s.deck.slides[s.current])
@@ -247,7 +247,77 @@ function BlockEditor({ block }: { block: Block }): React.JSX.Element {
           ))}
         </div>
       )
+    case 'gantt':
+      return <GanttEditor block={block} />
+    case 'funnel':
+      return (
+        <>
+          <RowsEditor
+            rows={block.stages.map((st) => [st.label, String(st.value)])}
+            cols={['Stage', 'Value']}
+            onChange={(rows) => up({ stages: rows.map(([label, v]) => ({ label, value: parseFloat(v.replace(/[^\d.-]/g, '')) || 0 })) })}
+          />
+          <input value={block.unit ?? ''} placeholder="Unit (optional, e.g. $)" onChange={(e) => up({ unit: e.target.value || undefined })} />
+        </>
+      )
   }
+}
+
+const CHART_KINDS: { id: ChartKind; label: string }[] = [
+  { id: 'column', label: 'Column' },
+  { id: 'bar', label: 'Bar' },
+  { id: 'stacked-column', label: 'Stacked' },
+  { id: 'stacked-bar', label: 'Stacked bar' },
+  { id: 'line', label: 'Line' },
+  { id: 'area', label: 'Area' },
+  { id: 'pie', label: 'Pie' },
+  { id: 'donut', label: 'Donut' },
+  { id: 'radar', label: 'Radar' }
+]
+
+function GanttEditor({ block }: { block: BlockOf<'gantt'> }): React.JSX.Element {
+  const up = useUpdate(block.id)
+  type Task = BlockOf<'gantt'>['tasks'][number]
+  const set = (i: number, patch: Partial<Task>): void => up({ tasks: block.tasks.map((t, j) => (j === i ? { ...t, ...patch } : t)) })
+  const addTask = (): void => {
+    const last = block.tasks[block.tasks.length - 1]
+    const start = last?.end ?? new Date().toISOString().slice(0, 10)
+    const end = new Date(Date.parse(start) + 14 * 86_400_000).toISOString().slice(0, 10)
+    up({ tasks: [...block.tasks, { name: 'New task', start, end, group: last?.group }] })
+  }
+  return (
+    <div className="rows gantt-rows">
+      {block.tasks.map((t, i) => (
+        <div className="gantt-row" key={i}>
+          <input className="g-name" value={t.name} placeholder="Task" onChange={(e) => set(i, { name: e.target.value })} />
+          <input className="g-start" type="date" value={t.start} title="Start" onChange={(e) => set(i, { start: e.target.value })} />
+          <span className="g-arrow">→</span>
+          <input className="g-end" type="date" value={t.end} title="End (same as start = milestone)" onChange={(e) => set(i, { end: e.target.value })} />
+          <input className="g-group" value={t.group ?? ''} placeholder="Group" title="Group (colour)" onChange={(e) => set(i, { group: e.target.value || undefined })} />
+          <input
+            className="g-pct"
+            title="Progress %"
+            value={t.progress ?? ''}
+            placeholder="%"
+            inputMode="numeric"
+            onChange={(e) => {
+              const v = parseFloat(e.target.value)
+              set(i, { progress: Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : undefined })
+            }}
+          />
+          <button className="icon-btn xs g-del" onClick={() => up({ tasks: block.tasks.filter((_, j) => j !== i) })}>
+            <X size={12} />
+          </button>
+        </div>
+      ))}
+      <div className="row">
+        <button className="btn sm ghost" onClick={addTask}>
+          <Plus size={13} /> Add task
+        </button>
+        <span className="hint">End = start makes a milestone ◆</span>
+      </div>
+    </div>
+  )
 }
 
 function ImageEditor({ block }: { block: BlockOf<'image'> }): React.JSX.Element {
@@ -328,10 +398,10 @@ function ChartEditor({ block }: { block: BlockOf<'chart'> }): React.JSX.Element 
 
   return (
     <>
-      <div className="seg small">
-        {(['column', 'bar', 'line', 'area', 'pie', 'donut'] as ChartKind[]).map((k) => (
-          <button key={k} className={block.kind === k ? 'on' : ''} onClick={() => up({ kind: k })}>
-            {k}
+      <div className="seg small wrap">
+        {CHART_KINDS.map((k) => (
+          <button key={k.id} className={block.kind === k.id ? 'on' : ''} onClick={() => up({ kind: k.id })}>
+            {k.label}
           </button>
         ))}
       </div>

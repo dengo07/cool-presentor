@@ -23,6 +23,8 @@ describe('AI schema', () => {
       timeline: null,
       features: [{ icon: 'NotARealIcon', title: 'Fast', text: null }],
       comparison: null,
+      gantt: null,
+      funnel: null,
       wantsImage: true,
       notes: 'Say hi'
     }

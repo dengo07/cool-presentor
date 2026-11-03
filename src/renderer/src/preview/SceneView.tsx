@@ -86,6 +86,7 @@ const ElView = memo(function ElView({ el, onPick }: { el: El; onPick?: (id: stri
             border: el.line ? `${el.line.width * PT}px solid ${rgba(el.line.color, el.line.alpha ?? 1)}` : undefined,
             boxSizing: 'border-box',
             borderRadius: el.shape === 'ellipse' ? '50%' : el.shape === 'roundRect' ? (el.radius ?? 0) * PX : 0,
+            clipPath: el.shape === 'diamond' ? 'polygon(50% 0, 100% 50%, 50% 100%, 0 50%)' : undefined,
             boxShadow: s ? `0 ${s.offset * PT}px ${s.blur * PT}px ${rgba(s.color, s.alpha)}` : undefined
           }}
         />
