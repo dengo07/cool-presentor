@@ -125,12 +125,46 @@ export const Block = z.discriminatedUnion('type', [
 
 export const Transition = z.enum(['morph', 'fade', 'none'])
 
+/**
+ * Free editing. A tweak nudges one block away from where its layout put it:
+ * offset (dx, dy in inches), scale (sx, sy) of the block's box, or hidden.
+ * Tweaks are stored per layout, so they never fight the auto-layout: another
+ * layout starts clean, and switching back restores them.
+ */
+export const Tweak = z.object({
+  dx: z.number().optional(),
+  dy: z.number().optional(),
+  sx: z.number().positive().optional(),
+  sy: z.number().positive().optional(),
+  hidden: z.boolean().optional()
+})
+
+/** Theme colour of a free item – stays on-theme when the theme changes. */
+export const FreeColor = z.enum(['text', 'muted', 'accent', 'accent2', 'accent3', 'alert'])
+
+/** A free item drawn on top of the layout at a fixed position (inches). */
+export const FreeItem = z.object({
+  id: z.string(),
+  kind: z.enum(['text', 'rect', 'ellipse', 'arrow']),
+  x: z.number(),
+  y: z.number(),
+  w: z.number(), // arrows run from (x, y) to (x + w, y + h); w/h may be negative
+  h: z.number(),
+  text: z.string().optional(),
+  color: FreeColor.optional(),
+  filled: z.boolean().optional(), // shapes: solid instead of outline
+  size: z.number().optional() // text: largest font size in pt
+})
+
 export const Slide = z.object({
   id,
   layout: z.string().default('auto'),
   blocks: z.array(Block),
   notes: z.string().default(''),
-  transition: Transition.default('morph')
+  transition: Transition.default('morph'),
+  /** layout id → block id → tweak */
+  tweaks: z.record(z.string(), z.record(z.string(), Tweak)).optional(),
+  extras: z.array(FreeItem).optional()
 })
 
 const hex = z.string().regex(/^[0-9A-Fa-f]{6}$/)
@@ -191,6 +225,9 @@ export type ThemeCustom = z.infer<typeof ThemeCustom>
 export type Assistant = z.infer<typeof Assistant>
 export type AssistantTurn = z.infer<typeof AssistantTurn>
 export type AssistantDoc = z.infer<typeof AssistantDoc>
+export type Tweak = z.infer<typeof Tweak>
+export type FreeItem = z.infer<typeof FreeItem>
+export type FreeColor = z.infer<typeof FreeColor>
 export type DiagramNode = z.infer<typeof DiagramNode>
 export type DiagramEdge = z.infer<typeof DiagramEdge>
 export type BlockOf<T extends BlockType> = Extract<Block, { type: T }>

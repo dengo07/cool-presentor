@@ -1475,3 +1475,127 @@ input[type='range'] {
   border-radius: 99px;
   font-size: 11.5px;
 }
+
+/* ---------------------------------------------------------------- free edit */
+.stage-frame {
+  position: relative;
+  flex: none;
+}
+.free-layer {
+  position: absolute;
+  inset: 0;
+  cursor: default;
+  touch-action: none;
+  user-select: none;
+}
+.free-layer.moving {
+  cursor: grabbing;
+}
+.free-box {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 3px;
+}
+.free-box.hover {
+  outline: 1px dashed rgba(139, 123, 255, 0.8);
+  outline-offset: 3px;
+}
+.free-box.sel {
+  outline: 1.5px solid var(--accent);
+  outline-offset: 3px;
+}
+.free-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #fff;
+  border: 1.5px solid var(--accent);
+  border-radius: 2px;
+  pointer-events: auto;
+}
+.free-handle.nw {
+  left: -9px;
+  top: -9px;
+  cursor: nwse-resize;
+}
+.free-handle.ne {
+  right: -9px;
+  top: -9px;
+  cursor: nesw-resize;
+}
+.free-handle.sw {
+  left: -9px;
+  bottom: -9px;
+  cursor: nesw-resize;
+}
+.free-handle.se {
+  right: -9px;
+  bottom: -9px;
+  cursor: nwse-resize;
+}
+.free-guide {
+  position: absolute;
+  pointer-events: none;
+  background: var(--accent2);
+}
+.free-guide.v {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+.free-guide.h {
+  left: 0;
+  right: 0;
+  height: 1px;
+}
+.free-text-edit {
+  position: absolute;
+  z-index: 2;
+  background: rgba(13, 14, 18, 0.92);
+  border: 1.5px solid var(--accent);
+  font-size: 15px;
+  padding: 6px 8px;
+}
+.free-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.free-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--line2);
+  margin: 0 4px;
+}
+.swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--line2);
+  cursor: pointer;
+  padding: 0;
+  flex: none;
+}
+.swatch.on {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.free-box.warn {
+  outline: 1.5px dashed var(--danger);
+  outline-offset: 2px;
+  background: rgba(255, 107, 129, 0.08);
+}
+.free-warn {
+  position: absolute;
+  pointer-events: none;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--danger);
+  color: #fff;
+  white-space: nowrap;
+}

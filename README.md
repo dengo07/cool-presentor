@@ -35,9 +35,11 @@ Cool Presentor is a desktop app where you never push boxes around. You type what
    - corner radius and decoration style
 
    Derived colours (highlights, chart colours, card lines, muted text) follow automatically. Contrast warnings flag hard-to-read combinations.
-4. **Duplicate & morph** (`Ctrl+D`). This duplicates a slide into a new layout. Because the elements keep their identity, PowerPoint's Morph animates between the two.
-5. **Present** (`F5`) right in the app, with the same morph-style animation, or **Export .pptx** (`Ctrl+E`).
-6. **AI (optional).**
+4. **Free edit** (button under the slide). For the small things a layout does not do: drag a block to move it, drag a corner to resize (Shift keeps the shape), arrow keys nudge, Delete hides it. Add free **text**, **boxes**, **circles** and **arrows** in theme colours on top of the layout. Moves snap to margins, the centre and other blocks, and a red outline warns when you drag onto other content.
+   - Free edits never fight the auto-layout: the layout runs first and your adjustments are applied on top, saved **per layout**. Editing the text keeps them; *Shuffle* to another layout starts clean, and switching back restores them. *Reset layout* removes them.
+5. **Duplicate & morph** (`Ctrl+D`). This duplicates a slide into a new layout. Because the elements keep their identity, PowerPoint's Morph animates between the two.
+6. **Present** (`F5`) right in the app, with the same morph-style animation, or **Export .pptx** (`Ctrl+E`).
+7. **AI (optional).**
    - **Generate** writes a whole deck from a brief, or from **attached documents**: PDF, Word, PowerPoint, text, Markdown, CSV or HTML. Click *Attach documents* or drop files into the dialog.
      - Old PowerPoint files can be redesigned this way.
      - The document's facts and numbers are used, and sources are mentioned in the speaker notes.
@@ -89,6 +91,7 @@ src/core/            pure TypeScript, no DOM – shared by app, exporter and tes
   ai-schema.ts       structured-output schema for Claude + conversion to blocks
   assistant.ts       deck → model context, and applying the assistant's edit operations
   diagram-text.ts    the text form of diagrams
+  freeform.ts        free edits: per-layout block tweaks and free items, applied after the layout
   layout/diagram.ts  diagram placement (layers, groups, ordering) and connector routing
 src/main/            Electron main: windows, menus, file dialogs, autosave, Claude calls
 src/preload/         typed IPC bridge (window.api)

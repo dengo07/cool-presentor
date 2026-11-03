@@ -194,6 +194,7 @@ How to work:
 - "this slide" / "here" means the current slide. Use slide and block ids exactly as given.
 - For edit_block send the complete new block JSON (without id) in the same shape as the deck JSON. Keep *highlight* markup style.
 - Use replace_slide only when a slide's structure must change (e.g. bullets into a diagram); insert_slide for new slides.
+- "freeItems" and "manuallyAdjusted" are the user's own free edits (text, boxes and arrows placed by hand, blocks moved by hand). You cannot change them; keep the blocks they refer to unless asked, and mention it if a request involves them.
 - Images are only described by alt text; never invent image data. You cannot draw pictures, but you can add native diagrams (type "diagram"), charts, timelines and the other block types.
 - Use facts from the attached documents and the deck; do not invent numbers. If something is unclear or missing, ask in "reply" and make no operations.
 - If the user only asks a question or for feedback, answer in "reply" with no operations.

@@ -149,7 +149,8 @@ export function App(): React.JSX.Element {
       } else if (mod && e.key.toLowerCase() === 'y' && !isTyping(e)) {
         e.preventDefault()
         useStore.temporal.getState().redo()
-      } else if (!isTyping(e) && !mod) {
+      } else if (!isTyping(e) && !mod && !useUi.getState().freeEdit) {
+        // (free edit mode uses arrows/Delete for the selected block – see FreeEdit.tsx)
         if (e.key === 'ArrowDown' || e.key === 'ArrowRight') st.select(st.current + 1)
         else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') st.select(st.current - 1)
         else if (e.key === 'Delete' && st.view === 'edit') st.removeSlide(st.current)

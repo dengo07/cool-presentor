@@ -19,7 +19,10 @@ export function describeDeckForAi(deck: Deck): string {
       id: s.id,
       ...(s.layout !== 'auto' ? { layout: s.layout } : {}),
       blocks: s.blocks.map((b) => (b.type === 'image' ? { id: b.id, type: 'image', alt: b.alt ?? '', hasImage: !!b.src } : b)),
-      ...(s.notes ? { notes: s.notes } : {})
+      ...(s.notes ? { notes: s.notes } : {}),
+      // the user's free edits: shown for context, not editable by the assistant
+      ...(s.extras?.length ? { freeItems: s.extras.map((e) => ({ kind: e.kind, ...(e.text ? { text: e.text } : {}) })) } : {}),
+      ...(s.tweaks ? { manuallyAdjusted: true } : {})
     }))
   })
 }

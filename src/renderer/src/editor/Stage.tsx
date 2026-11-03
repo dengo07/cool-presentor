@@ -1,10 +1,12 @@
-import { useLayoutEffect, useRef, useState } from 'react'
-import { Copy, Shuffle } from 'lucide-react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Copy, Move, Shuffle } from 'lucide-react'
 import { candidates } from '@core/layout/engine'
 import type { Scene } from '@core/scene'
 import type { Transition } from '@core/model'
 import { SceneView } from '../preview/SceneView'
 import { useStore } from '../store'
+import { useUi } from '../ui'
+import { FreeEditBar, FreeEditLayer, type Live, previewScene } from './FreeEdit'
 
 function useSize(ref: React.RefObject<HTMLElement | null>): { w: number; h: number } {
   const [size, setSize] = useState({ w: 800, h: 450 })
@@ -36,6 +38,10 @@ export function Stage({ scenes }: { scenes: Scene[] }): React.JSX.Element {
   const setFocusBlock = useStore((s) => s.setFocusBlock)
   const wrap = useRef<HTMLDivElement>(null)
   const { w, h } = useSize(wrap)
+  const freeEdit = useUi((s) => s.freeEdit)
+  const [live, setLive] = useState<Live | null>(null)
+  // selection belongs to one slide
+  useEffect(() => useUi.getState().setFreeSel(null), [current])
   const slide = deck.slides[current]
   const scene = scenes[current]
   if (!slide || !scene) return <main className="stage" />
@@ -45,15 +51,23 @@ export function Stage({ scenes }: { scenes: Scene[] }): React.JSX.Element {
 
   return (
     <main className="stage">
-      <div className="stage-canvas" ref={wrap} onMouseDown={() => setFocusBlock(null)}>
-        <SceneView
-          scene={scene}
-          width={width}
-          animate
-          className="stage-slide"
-          onPick={(id) => setFocusBlock(blockForElement(id, slide.blocks))}
-        />
+      <div className="stage-canvas" ref={wrap} onMouseDown={() => !freeEdit && setFocusBlock(null)}>
+        <div className="stage-frame" style={{ width, height: (width * 9) / 16 }}>
+          <SceneView
+            scene={freeEdit ? previewScene(scene, slide, live) : scene}
+            width={width}
+            animate={!freeEdit}
+            className="stage-slide"
+            onPick={freeEdit ? undefined : (id) => setFocusBlock(blockForElement(id, slide.blocks))}
+          />
+          {freeEdit && <FreeEditLayer scene={scene} slide={slide} slideIndex={current} width={width} onLive={setLive} />}
+        </div>
       </div>
+      {freeEdit ? (
+        <div className="layoutbar">
+          <FreeEditBar scene={scene} slideIndex={current} />
+        </div>
+      ) : (
       <div className="layoutbar">
         <span className="label">Layout</span>
         <div className="chips">
@@ -75,6 +89,10 @@ export function Stage({ scenes }: { scenes: Scene[] }): React.JSX.Element {
           )}
         </div>
         <div className="spacer" />
+        {slide.tweaks?.[scene.layoutId] && <span className="hint" title="This layout has manual adjustments">Adjusted</span>}
+        <button className="btn sm" onClick={() => useUi.getState().setFreeEdit(true)} title="Move, resize or hide blocks and add free text, boxes and arrows">
+          <Move size={14} /> Free edit
+        </button>
         <button className="btn sm" onClick={() => shuffle(current)} title="Shuffle layout (Ctrl+L)" disabled={cands.length < 2}>
           <Shuffle size={14} /> Shuffle
         </button>
@@ -89,6 +107,7 @@ export function Stage({ scenes }: { scenes: Scene[] }): React.JSX.Element {
           </select>
         </label>
       </div>
+      )}
     </main>
   )
 }

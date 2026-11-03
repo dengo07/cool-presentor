@@ -5,6 +5,7 @@ import { deckTheme, type Theme } from '../themes'
 import type { Ctx } from './ctx'
 import { decorate } from './deco'
 import { getLayout, LAYOUTS, signature } from './layouts'
+import { applyFreeform } from '../freeform'
 
 export interface Candidate {
   id: string
@@ -57,6 +58,8 @@ export function buildScene(slide: Slide, index: number, total: number, layoutId:
   ctx.els.push({ kind: 'shape', id: 'bg', shape: 'rect', x: 0, y: 0, w: SLIDE_W, h: SLIDE_H, fill: theme.bg })
   ctx.els.push(...decorate(ctx, layout.zone))
   layout.render(ctx)
+  // free edits for this layout + free items, on top of the auto-layout
+  applyFreeform(ctx, layout.id)
   return { bg: theme.bgColor, elements: ctx.els, notes: slide.notes, transition: slide.transition, layoutId: layout.id }
 }
 
